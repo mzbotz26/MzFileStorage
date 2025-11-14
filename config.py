@@ -9,14 +9,14 @@ class Config:
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
     # Your Admin User ID
-    ADMIN_ID = int(os.environ.get("ADMIN_ID", ""))
+    ADMIN_ID = int(os.environ.get("ADMIN_ID", "6139607609 5673859971"))
     
     # Your Owner DB Channel ID
-    OWNER_DB_CHANNEL = int(os.environ.get("OWNER_DB_CHANNEL", "-1002535247194"))
+    OWNER_DB_CHANNEL = int(os.environ.get("OWNER_DB_CHANNEL", "-1003433884727"))
 
     # Your MongoDB Connection String
     MONGO_URI = os.environ.get("MONGO_URI", "")
-    DATABASE_NAME = os.environ.get("DATABASE_NAME", "telegram_bot_v3")
+    DATABASE_NAME = os.environ.get("DATABASE_NAME", "File_Storage")
     
     # --- TMDB API Key (Optional, for posters) ---
     TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "5a318417c7f4a722afd9d71df548877b") #add your own
