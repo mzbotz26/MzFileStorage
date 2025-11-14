@@ -2,8 +2,8 @@ import os
 
 class Config:
     # Your API details from my.telegram.org
-    API_ID = int(os.environ.get("API_ID", ""))
-    API_HASH = os.environ.get("API_HASH", "")
+    API_ID = int(os.environ.get("API_ID", "13441344"))
+    API_HASH = os.environ.get("API_HASH", "2f10533d9068507d0c10bf1074527167")
 
     # Your Bot Token
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
