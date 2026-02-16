@@ -109,23 +109,55 @@ async def update_monthly_record(owner_id: int, new_count: int, record_date: date
 # --- END: New Functions ---
 
 
-async def is_user_verified(requester_id: int, owner_id: int) -> bool:
+async def add_verified_user(owner_id: int, requester_id: int):
+    """
+    Adds or updates a verified user entry with current timestamp.
+    """
     try:
-        verification = await verified_users.find_one({'requester_id': requester_id, 'owner_id': owner_id})
-        if not verification or 'verified_at' not in verification or not isinstance(verification['verified_at'], datetime.datetime):
+        await verified_users.update_one(
+            {
+                "owner_id": owner_id,
+                "requester_id": requester_id
+            },
+            {
+                "$set": {
+                    "verified_at": datetime.datetime.utcnow()
+                }
+            },
+            upsert=True
+        )
+        logger.info(f"User {requester_id} verified for owner {owner_id}")
+    except Exception as e:
+        logger.error(f"Error adding verified user: {e}")
+
+
+async def is_user_verified(owner_id: int, requester_id: int) -> bool:
+    """
+    Checks if user is verified within last 24 hours.
+    """
+    try:
+        verification = await verified_users.find_one(
+            {
+                "owner_id": owner_id,
+                "requester_id": requester_id
+            }
+        )
+
+        if (
+            not verification or
+            "verified_at" not in verification or
+            not isinstance(verification["verified_at"], datetime.datetime)
+        ):
             return False
+
+        # 24 hours expiry check
         twenty_four_hours_ago = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
-            return verification['verified_at'] > twenty_four_hours_ago
+
+        return verification["verified_at"] > twenty_four_hours_ago
+
     except Exception as e:
         logger.error(f"An error occurred in is_user_verified check: {e}")
         return False
-
-async def add_user_verification(requester_id: int, owner_id: int):
-    await verified_users.update_one(
-        {'requester_id': requester_id, 'owner_id': owner_id},
-        {"$set": {'verified_at': datetime.datetime.utcnow()}},
-        upsert=True
-    )
 
 async def claim_verification_for_file(owner_id: int, file_unique_id: str, requester_id: int) -> bool:
     """Marks a file as 'verification claimed' for a specific owner to prevent reuse."""
