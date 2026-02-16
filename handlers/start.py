@@ -123,122 +123,112 @@ async def send_file(client, requester_id, owner_id, file_unique_id):
 
 @Client.on_message(filters.command("start") & filters.private)
 async def start_command(client, message):
-    if message.from_user.is_bot: return
+    if message.from_user.is_bot:
+        return
+
     requester_id = message.from_user.id
     await add_user(requester_id)
-    
+
     if len(message.command) > 1:
         payload = message.command[1]
+
         try:
+            # ===============================
+            # VERIFY PAYLOAD HANDLER
+            # ===============================
+            if payload.startswith("verify_"):
+                _, owner_id_str, file_unique_id = payload.split("_", 2)
+                owner_id = int(owner_id_str)
+
+                await claim_verification_for_file(owner_id, requester_id)
+
+                await message.reply_text("✅ Verification successful! Sending your file...")
+
+                await send_file(client, requester_id, owner_id, file_unique_id)
+                return
+
+            # ===============================
+            # PUBLIC FILE REQUEST
+            # ===============================
             if payload.startswith("get_"):
-                # --- DECREED MODIFICATION: Check for APP_URL ---
                 if not Config.APP_URL:
-                    await message.reply_text("Sorry, the bot's streaming service is not configured by the admin.")
-                    return
+                    return await message.reply_text("Streaming service not configured.")
+
                 await handle_public_file_request(client, message, requester_id, payload)
-            
+
+            # ===============================
+            # OWNER SPECIAL LINK
+            # ===============================
             elif payload.startswith("ownerget_"):
-                 # --- DECREED MODIFICATION: Check for APP_URL ---
-                 if not Config.APP_URL:
-                    await message.reply_text("Sorry, the bot's streaming service is not configured by the admin.")
-                    return
-                 _, owner_id_str, file_unique_id = payload.split("_", 2)
-                 owner_id = int(owner_id_str)
-                 if requester_id == owner_id:
-                     await send_file(client, requester_id, owner_id, file_unique_id)
-                 else:
+                if not Config.APP_URL:
+                    return await message.reply_text("Streaming service not configured.")
+
+                _, owner_id_str, file_unique_id = payload.split("_", 2)
+                owner_id = int(owner_id_str)
+
+                if requester_id == owner_id:
+                    await send_file(client, requester_id, owner_id, file_unique_id)
+                else:
                     await message.reply_text("This is a special link for the file owner only.")
 
-        except UserIsBlocked:
-             logger.warning(f"User {requester_id} blocked the bot during /start command processing.")
-        except Exception as e:
-            logger.exception("Error processing deep link in /start")
-            try:
-                await message.reply_text("Something went wrong or the link is invalid.")
-            except UserIsBlocked:
-                pass
+        except Exception:
+            logger.exception("Error in /start deep link")
+            await message.reply_text("Something went wrong or the link is invalid.")
+
     else:
         text = (
             f"Hello {message.from_user.mention}! 👋\n\n"
-            "Welcome to your advanced **File Management Assistant**.\n\n"
-            "I can help you store, manage, and share your files effortlessly. "
-            "Whether you're looking for a quick streaming link or want to automate your channel posts, I have the tools for you.\n\n"
-            "**Here's what I can do:**\n"
-            "🗂️ **File Storage & Management**\n"
-            "› Save unlimited files in your private channels.\n"
-            "› Get fast direct download & streaming links.\n\n"
-            "📢 **Powerful Auto-Posting**\n"
-            "› Auto-post from storage channels to public channels.\n"
-            "› Full customization of captions, posters, and buttons.\n\n"
-            "Click **Let's Go 🚀** to open your settings menu and begin!"
+            "Welcome to your advanced File Management Assistant.\n\n"
+            "Click Let's Go 🚀 to open your settings menu."
         )
-        
-        # --- LEGENDARY MODIFICATION: Placed "Let's Go" and "Tutorial" on the same row ---
+
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("Let's Go 🚀", callback_data=f"go_back_{requester_id}"),
                 InlineKeyboardButton("Tutorial 🎬", url=Config.TUTORIAL_URL)
-            ],
-            [
-                InlineKeyboardButton("📢 Update Channel", url="https://t.me/mzbotz"),
-                InlineKeyboardButton("👑 Owner", url="https://t.me/mzowner")
             ]
         ])
-        
+
         await message.reply_text(text, reply_markup=keyboard)
 
 
 async def handle_public_file_request(client, message, requester_id, payload):
+
     try:
         _, owner_id_str, file_unique_id = payload.split("_", 2)
         owner_id = int(owner_id_str)
-    except (ValueError, IndexError):
-        return await message.reply_text("The link is invalid or corrupted.")
+    except:
+        return await message.reply_text("Invalid link.")
 
     file_data = await get_file_by_unique_id(owner_id, file_unique_id)
-    if not file_data: return await message.reply_text("File not found or link has expired.")
-    
+    if not file_data:
+        return await message.reply_text("File not found.")
+
     owner_settings = await get_user(owner_id)
-    
-    fsub_channel = owner_settings.get('fsub_channel')
-    if fsub_channel:
-        try:
-            await client.get_chat_member(chat_id=fsub_channel, user_id="me")
-            try:
-                await client.get_chat_member(chat_id=fsub_channel, user_id=requester_id)
-            except UserNotParticipant:
-                try:
-                    invite_link = await client.export_chat_invite_link(fsub_channel)
-                except Exception:
-                    invite_link = None
-                
-                buttons = []
-                if invite_link:
-                    buttons.append([InlineKeyboardButton("📢 Join Channel", url=invite_link)])
-                
-                buttons.append([InlineKeyboardButton("🔄 Retry", callback_data=f"retry_{payload}")])
-                
-                return await message.reply_text(
-                    "You must join the channel to continue.",
-                    reply_markup=InlineKeyboardMarkup(buttons)
-                )
-        except (ChatAdminRequired, ChannelInvalid, PeerIdInvalid, ChannelPrivate, UserNotParticipant) as e:
-            logger.error(f"FSub channel error for owner {owner_id} (Channel: {fsub_channel}): {e}")
-            try:
-                await client.send_message(
-                    chat_id=owner_id,
-                    text=(
-                        "⚠️ **FSub Channel Error**\n\n"
-                        f"A user was unable to access your file because your FSub channel (`{fsub_channel}`) is no longer valid.\n\n"
-                        "Your FSub channel has been **automatically disabled**."
-                    )
-                )
-                await update_user(owner_id, "fsub_channel", None)
-            except Exception as notify_error:
-                logger.error(f"Could not notify owner {owner_id} about their invalid FSub channel: {notify_error}")
-            pass 
-    
+
+    # ===============================
+    # VERIFY CHECK ADDED HERE
+    # ===============================
+    verified = await is_user_verified(owner_id, requester_id)
+
+    if not verified:
+        verify_link = f"https://t.me/{client.me.username}?start=verify_{owner_id}_{file_unique_id}"
+        shortlink = await get_shortlink(verify_link)
+
+        buttons = [
+            [InlineKeyboardButton("🔐 Verify Now", url=shortlink)]
+        ]
+
+        return await message.reply_text(
+            "⚠️ You must verify to access this file.\n\nClick below to verify.",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+
+    # ===============================
+    # IF VERIFIED → SEND FILE
+    # ===============================
     await send_file(client, requester_id, owner_id, file_unique_id)
+    
 
 
 @Client.on_callback_query(filters.regex(r"^retry_"))
