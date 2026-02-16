@@ -16,10 +16,10 @@ class Config:
 
     # Your MongoDB Connection String
     MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://yogedrasama:D8oNvWFxBws2et6W@cluster0.5m2w6n8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-    DATABASE_NAME = os.environ.get("DATABASE_NAME", "FileStorage")
+    DATABASE_NAME = os.environ.get("DATABASE_NAME", "File_Storage")
     
     # --- TMDB API Key (Optional, for posters) ---
-    TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "5a318417c7f4a722afd9d71df548877b") #add your own
+    TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "") #add your own
     
     # --- DECREED MODIFICATION: Replaced VPS_IP and VPS_PORT ---
     # The full public URL of your application (e.g., https://my-bot.koyeb.app or https://my-bot.herokuapp.com)
