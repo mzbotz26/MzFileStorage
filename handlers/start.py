@@ -153,7 +153,7 @@ async def start_command(client, message):
                 await claim_verification_for_file(owner_id, file_unique_id, requester_id)
 
                 # 24 Hour Success Message
-                await message.reply(
+                await message.reply_text(
                     "✅ <b>Verification Successful!</b>\n\n"
                     "⏳ Your access is now valid for <b>24 Hours</b>.\n"
                     "After that, you will need to verify again.\n\n"
