@@ -24,7 +24,7 @@ class Config:
     # --- DECREED MODIFICATION: Replaced VPS_IP and VPS_PORT ---
     # The full public URL of your application (e.g., https://my-bot.koyeb.app or https://my-bot.herokuapp.com)
     # DO NOT add a trailing slash / at the end!
-    APP_URL = os.environ.get("APP_URL", "")
+    APP_URL = os.environ.get("APP_URL", "https://few-agnese-mztech-651f3c23.koyeb.app")
     
     # The name of the file that stores your bot's username (for the redirector)
     BOT_USERNAME_FILE = "bot_username.txt" #do not change this
