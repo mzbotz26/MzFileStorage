@@ -168,7 +168,7 @@ async def claim_verification_for_file(owner_id: int, file_unique_id: str, reques
     }
     result = await files.update_one(unclaimed_file_query, {'$set': {'verification_claimed': True}})
     if result.modified_count > 0:
-        await add_user_verification(requester_id, owner_id)
+        await add_verified_user(owner_id, requester_id) 
         # --- STATS: Record a view on successful verification claim ---
         await record_daily_view(owner_id, requester_id)
         return True
