@@ -209,7 +209,7 @@ async def start_command(client, message):
     await message.reply_text(
         text,
         reply_markup=keyboard,
-        parse_mode=enums.ParseMode.MARKDOWN,
+        parse_mode=enums.ParseMode.HTML,
         disable_web_page_preview=True
                 )
 
