@@ -123,6 +123,7 @@ async def send_file(client, requester_id, owner_id, file_unique_id):
 
 @Client.on_message(filters.command("start") & filters.private)
 async def start_command(client, message):
+
     if message.from_user.is_bot:
         return
 
@@ -133,9 +134,8 @@ async def start_command(client, message):
         payload = message.command[1]
 
         try:
-            # ===============================
-            # VERIFY PAYLOAD HANDLER
-            # ===============================
+
+            # ================= VERIFY HANDLER =================
             if payload.startswith("verify_"):
                 _, owner_id_str, file_unique_id = payload.split("_", 2)
                 owner_id = int(owner_id_str)
@@ -143,23 +143,19 @@ async def start_command(client, message):
                 await claim_verification_for_file(owner_id, requester_id)
 
                 await message.reply_text("✅ Verification successful! Sending your file...")
-
                 await send_file(client, requester_id, owner_id, file_unique_id)
                 return
 
-            # ===============================
-            # PUBLIC FILE REQUEST
-            # ===============================
+            # ================= PUBLIC FILE =================
             if payload.startswith("get_"):
                 if not Config.APP_URL:
                     return await message.reply_text("Streaming service not configured.")
 
                 await handle_public_file_request(client, message, requester_id, payload)
+                return
 
-            # ===============================
-            # OWNER SPECIAL LINK
-            # ===============================
-            elif payload.startswith("ownerget_"):
+            # ================= OWNER LINK =================
+            if payload.startswith("ownerget_"):
                 if not Config.APP_URL:
                     return await message.reply_text("Streaming service not configured.")
 
@@ -169,27 +165,44 @@ async def start_command(client, message):
                 if requester_id == owner_id:
                     await send_file(client, requester_id, owner_id, file_unique_id)
                 else:
-                    await message.reply_text("This is a special link for the file owner only.")
+                    await message.reply_text("This link is only for the file owner.")
+                return
 
         except Exception:
-            logger.exception("Error in /start deep link")
-            await message.reply_text("Something went wrong or the link is invalid.")
+            logger.exception("Deep link error")
+            return await message.reply_text("Invalid or expired link.")
 
-    else:
-        text = (
-            f"Hello {message.from_user.mention}! 👋\n\n"
-            "Welcome to your advanced File Management Assistant.\n\n"
-            "Click Let's Go 🚀 to open your settings menu."
-        )
+    # ================= NORMAL START MESSAGE =================
 
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("Let's Go 🚀", callback_data=f"go_back_{requester_id}"),
-                InlineKeyboardButton("Tutorial 🎬", url=Config.TUTORIAL_URL)
-            ]
-        ])
+    text = (
+        f"Hello {message.from_user.mention}! 👋\n\n"
+        "Welcome to your advanced **File Management Assistant**.\n\n"
+        "I can help you store, manage, and share your files effortlessly.\n\n"
+        "**Here's what I can do:**\n"
+        "🗂️ Save unlimited files\n"
+        "📺 Instant streaming links\n"
+        "📢 Auto channel posting\n"
+        "⚙️ Full customization system\n\n"
+        "Click **Let's Go 🚀** to open your settings menu!"
+    )
 
-        await message.reply_text(text, reply_markup=keyboard)
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Let's Go 🚀", callback_data=f"go_back_{requester_id}"),
+            InlineKeyboardButton("Tutorial 🎬", url=Config.TUTORIAL_URL)
+        ],
+        [
+            InlineKeyboardButton("📢 Update Channel", url="https://t.me/mzbotz"),
+            InlineKeyboardButton("👑 Owner", url="https://t.me/mzowner")
+        ]
+    ])
+
+    await message.reply_text(
+        text,
+        reply_markup=keyboard,
+        parse_mode=enums.ParseMode.MARKDOWN,
+        disable_web_page_preview=True
+                )
 
 
 async def handle_public_file_request(client, message, requester_id, payload):
