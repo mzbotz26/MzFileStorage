@@ -158,7 +158,7 @@ async def start_command(client, message):
                     "⏳ Your access is now valid for <b>24 Hours</b>.\n"
                     "After that, you will need to verify again.\n\n"
                     "Enjoy your file 🎉",
-                    parse_mode="HTML"
+                    parse_mode=enums.ParseMode.HTML
                 )
 
                 # Send file
