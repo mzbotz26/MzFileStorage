@@ -275,7 +275,14 @@ async def handle_public_file_request(client, message, requester_id, payload):
     # VERIFY CHECK (NEW)
     # ===============================
     verified = await is_user_verified(owner_id, requester_id)
-
+               # Send 24 hour confirmation message
+               await message.reply(
+                   "✅ <b>Verification Successful!</b>\n\n"
+                   "⏳ Your access is now valid for <b>24 Hours</b>.\n"
+                   "After that, you will need to verify again.\n\n"
+                   "Enjoy your file 🎉",
+                   parse_mode="HTML"
+              )
     if not verified:
         verify_link = f"https://t.me/{client.me.username}?start=verify_{owner_id}_{file_unique_id}"
         shortlink = await get_shortlink(deep_link, requester_id)
