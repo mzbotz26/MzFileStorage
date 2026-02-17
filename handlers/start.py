@@ -282,17 +282,30 @@ async def handle_public_file_request(client, message, requester_id, payload):
                 pass
 
     # ===============================
-    # VERIFY CHECK
+    # VERIFY CHECK (OWNER BYPASS + DYNAMIC TUTORIAL FIXED)
     # ===============================
-    verified = await is_user_verified(owner_id, requester_id)
+
+    if requester_id == owner_id or requester_id == Config.ADMIN_ID:
+        verified = True
+    else:
+        verified = await is_user_verified(owner_id, requester_id)
 
     if not verified:
+
         deep_link = f"https://t.me/{client.me.username}?start=verify_{owner_id}_{file_unique_id}"
         shortlink = await get_shortlink(deep_link, owner_id)
 
+        # ✅ Correct DB field name used
+        tutorial_link = None
+        if owner_settings:
+            tutorial_link = owner_settings.get("how_to_download_link")
+
+        if not tutorial_link:
+            tutorial_link = Config.TUTORIAL_URL
+
         buttons = [
             [InlineKeyboardButton("🔐 Verify Now", url=shortlink)],
-            [InlineKeyboardButton("📖 How To Verify", url=Config.TUTORIAL_URL)]
+            [InlineKeyboardButton("📖 How To Verify", url=tutorial_link)]
         ]
 
         return await message.reply_text(
@@ -304,8 +317,11 @@ async def handle_public_file_request(client, message, requester_id, payload):
         )
 
     # ===============================
-    # IF VERIFIED → SEND FILE
+    # VERIFIED → RECORD STATS + SEND FILE
     # ===============================
+
+    await record_daily_view(owner_id, requester_id)
+
     await send_file(client, requester_id, owner_id, file_unique_id)
     
 
