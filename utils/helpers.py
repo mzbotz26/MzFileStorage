@@ -370,7 +370,7 @@ async def create_post(client, user_id, messages, cache: dict):
 
     if len(final_posts) > 1:
         for i, (poster, cap, foot) in enumerate(final_posts):
-            new_header = f"🔖 **Title:** {primary_display_title} (Part {i+1}/{len(final_posts)})\n"
+            new_header = f"🔖 **Title:** {primary_display_title} (Part {i+1}/{len(final_posts)})\n\n"
             new_cap = cap.replace(base_caption_header, new_header)
             final_posts[i] = (poster, new_cap, foot)
 
