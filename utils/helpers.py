@@ -334,7 +334,7 @@ async def create_post(client, user_id, messages, cache: dict):
     final_posts = []
     current_links_part = []
 
-    base_caption_header = f"🔖 **Title:** {primary_display_title}\n"
+    base_caption_header = f"🔖 **Title:** {primary_display_title}\n\n"
     powered_by = "\n\n💪 Powered By : [MzMoviiez](https://t.me/MzMoviiez)"
 
     current_length = len(base_caption_header)
@@ -343,7 +343,7 @@ async def create_post(client, user_id, messages, cache: dict):
         if current_length + len(entry) + 2 > CAPTION_LIMIT and current_links_part:
             final_caption = (
                 base_caption_header
-                + "\n".join(current_links_part)
+                + "\n\n".join(current_links_part)
                 + powered_by
             )
 
@@ -360,7 +360,7 @@ async def create_post(client, user_id, messages, cache: dict):
     if current_links_part:
         final_caption = (
             base_caption_header
-            + "\n".join(current_links_part)
+            + "\n\n".join(current_links_part)
             + powered_by
         )
 
