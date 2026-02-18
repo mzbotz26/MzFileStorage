@@ -261,11 +261,16 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
 
 async def create_post(client, user_id, messages, cache: dict):
     user = await get_user(user_id)
-    if not user: return []
+    if not user:
+        return []
 
     media_info_list = []
-    # In the main flow, messages are Pyrogram Message objects
-    parse_tasks = [clean_and_parse_filename(getattr(m, m.media.value, None).file_name, cache) for m in messages if getattr(m, m.media.value, None)]
+
+    parse_tasks = [
+        clean_and_parse_filename(getattr(m, m.media.value, None).file_name, cache)
+        for m in messages if getattr(m, m.media.value, None)
+    ]
+
     parsed_results = await asyncio.gather(*parse_tasks)
 
     for i, info in enumerate(parsed_results):
@@ -275,89 +280,100 @@ async def create_post(client, user_id, messages, cache: dict):
             info['file_unique_id'] = media.file_unique_id
             media_info_list.append(info)
 
-    if not media_info_list: return []
+    if not media_info_list:
+        return []
 
     media_info_list.sort(key=lambda x: natural_sort_key(x.get('episode_info', '')))
     first_info = media_info_list[0]
     primary_display_title = first_info['display_title']
-    
-    poster_search_query = first_info['batch_title'].replace(first_info.get('season_info', ''), '').strip()
-    post_poster = await get_poster(poster_search_query, first_info['year']) if user.get('show_poster', True) else None
-    
+
+    poster_search_query = first_info['batch_title'].replace(
+        first_info.get('season_info', ''), ''
+    ).strip()
+
+    post_poster = await get_poster(
+        poster_search_query,
+        first_info['year']
+    ) if user.get('show_poster', True) else None
+
     footer_buttons = user.get('footer_buttons', [])
-    footer_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn['name'], url=btn['url'])] for btn in footer_buttons]) if footer_buttons else None
-    
+    footer_keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton(btn['name'], url=btn['url'])] for btn in footer_buttons]
+    ) if footer_buttons else None
+
     CAPTION_LIMIT = PHOTO_CAPTION_LIMIT if post_poster else TEXT_MESSAGE_LIMIT
-    
+
     all_link_entries = []
+
     for info in media_info_list:
         display_tags_parts = []
-        
-        if info.get('episode_info'):
-            numbers = re.findall(r'\d+', info['episode_info'])
-            ep_text = f"EP {numbers[0]}" if len(numbers) == 1 else f"EP {numbers[0]}-{numbers[1]}" if len(numbers) >= 2 else ""
-            if ep_text: display_tags_parts.append(ep_text)
-        
+
         languages = info.get('languages', [])
         if languages:
             display_tags_parts.append(" + ".join(languages))
 
         if info.get('quality_tags'):
             display_tags_parts.append(info['quality_tags'])
-        
-        display_tags = " | ".join(filter(None, display_tags_parts))
-        
-        # --- LEGENDARY CORRECTION: Generate a bot deep link, not a direct file link. ---
-        # This is the correct implementation based on the user's true intent.
+
+        display_tags = " ".join(filter(None, display_tags_parts))
+
         owner_id = user_id
         file_unique_id = info['file_unique_id']
-        bot_username = client.me.username # client object is passed to create_post
-        
-        # This deep link will trigger the 'start' command in handlers/start.py
+        bot_username = client.me.username
+
         deep_link = f"https://t.me/{bot_username}?start=get_{owner_id}_{file_unique_id}"
-        
-        # The deep link is then shortened.
         link = deep_link
-        # --- END LEGENDARY CORRECTION ---
 
         file_size_str = format_bytes(info['file_size'])
-        all_link_entries.append(f"├─📁 {display_tags or 'File'}\n│  ╰─➤ [Click Here]({link}) ({file_size_str})")
 
-    final_posts, current_links_part = [], []
-    
-    base_caption_header = f"╭─🎬 **{primary_display_title}** ─╮"
-    
-    clean_header_text = f"🎬 {primary_display_title}"
-    header_content_length = len(clean_header_text)
-    
-    footer_middle_length = int(header_content_length * 0.9)
-    footer_middle = '─' * footer_middle_length
-    footer_line = f"╰{footer_middle}╯"
+        all_link_entries.append(
+            f"📁 ➤ {display_tags or 'File'}\n"
+            f"📥 ➪ [Click Here]({link}) ({file_size_str})"
+        )
 
-    base_caption = f"{base_caption_header}\n│"
-    current_length = len(base_caption) + len(footer_line)
+    final_posts = []
+    current_links_part = []
+
+    base_caption_header = f"🔖 **Title:** {primary_display_title}\n"
+    powered_by = "\n\n💪 Powered By : [MzMoviiez](https://t.me/MzMoviiez)"
+
+    current_length = len(base_caption_header)
 
     for entry in all_link_entries:
         if current_length + len(entry) + 2 > CAPTION_LIMIT and current_links_part:
-            final_caption = f"{base_caption}\n\n" + "\n\n".join(current_links_part) + f"\n\n{footer_line}"
-            final_posts.append((post_poster if not final_posts else None, final_caption, footer_keyboard))
-            
+            final_caption = (
+                base_caption_header
+                + "\n".join(current_links_part)
+                + powered_by
+            )
+
+            final_posts.append(
+                (post_poster if not final_posts else None, final_caption, footer_keyboard)
+            )
+
             current_links_part = [entry]
-            current_length = len(base_caption) + len(footer_line) + len(entry) + 2
+            current_length = len(base_caption_header) + len(entry)
         else:
             current_links_part.append(entry)
             current_length += len(entry) + 2
-            
+
     if current_links_part:
-        final_caption = f"{base_caption}\n\n" + "\n\n".join(current_links_part) + f"\n\n{footer_line}"
-        final_posts.append((post_poster if not final_posts else None, final_caption, footer_keyboard))
-        
+        final_caption = (
+            base_caption_header
+            + "\n".join(current_links_part)
+            + powered_by
+        )
+
+        final_posts.append(
+            (post_poster if not final_posts else None, final_caption, footer_keyboard)
+        )
+
     if len(final_posts) > 1:
         for i, (poster, cap, foot) in enumerate(final_posts):
-            new_header = f"╭─🎬 **{primary_display_title} (Part {i+1}/{len(final_posts)})** ─╮"
+            new_header = f"🔖 **Title:** {primary_display_title} (Part {i+1}/{len(final_posts)})\n"
             new_cap = cap.replace(base_caption_header, new_header)
             final_posts[i] = (poster, new_cap, foot)
-            
+
     return final_posts
 
 def calculate_title_similarity(title1: str, title2: str) -> float:
