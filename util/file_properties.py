@@ -1,4 +1,4 @@
-# util/file_properties.py
+# mzbotz/mz-file-store/util/file_properties.py
 
 from pyrogram import Client
 from typing import Any
