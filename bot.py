@@ -1,4 +1,4 @@
-# widhvans/store/widhvans-store-534fed577ca4f8a9e792ca6e531bd8a25e941178/bot.py
+# mzbotz/mz-file-store/bot.py
 import logging
 import asyncio
 import time
