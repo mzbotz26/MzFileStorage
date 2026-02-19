@@ -1,4 +1,4 @@
-# widhvans/store/widhvans-store-a32dae6d5f5487c7bc78b13e2cdc18082aef6c58/utils/helpers.py
+# mzbotz/mz-file-store/utils/helpers.py
 
 import re
 import base64
@@ -315,7 +315,7 @@ async def create_post(client, user_id, messages, cache: dict):
         if info.get('quality_tags'):
             display_tags_parts.append(info['quality_tags'])
 
-        display_tags = " ".join(filter(None, display_tags_parts))
+        display_tags = " | ".join(filter(None, display_tags_parts))
 
         owner_id = user_id
         file_unique_id = info['file_unique_id']
@@ -334,8 +334,8 @@ async def create_post(client, user_id, messages, cache: dict):
     final_posts = []
     current_links_part = []
 
-    base_caption_header = f"🔖 **Title:** {primary_display_title}\n\n"
-    powered_by = "\n\n💪 Powered By : [MzMoviiez](https://t.me/MzMoviiez)"
+    base_caption_header = f"🔖 **Title: {primary_display_title}**\n\n"
+    powered_by = "\n\n💪 **Powered By : [MzMoviiez](https://t.me/MzMoviiez)**"
 
     current_length = len(base_caption_header)
 
@@ -370,7 +370,7 @@ async def create_post(client, user_id, messages, cache: dict):
 
     if len(final_posts) > 1:
         for i, (poster, cap, foot) in enumerate(final_posts):
-            new_header = f"🔖 **Title:** {primary_display_title} (Part {i+1}/{len(final_posts)})\n\n"
+            new_header = f"🔖 **Title: {primary_display_title} (Part {i+1}/{len(final_posts)})**\n\n"
             new_cap = cap.replace(base_caption_header, new_header)
             final_posts[i] = (poster, new_cap, foot)
 
