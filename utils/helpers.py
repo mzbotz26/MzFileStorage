@@ -194,7 +194,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     
     # ✅ FORCE YEAR DETECTION FIX
     if not year_from_filename:
-        year_match = re.search(r'\b(19|20)\d{2}\b', name)
+        year_match = re.search(r'\b(?:19|20)\d{2}\b', name)
         if year_match:
             year_from_filename = int(year_match.group(0))
               
