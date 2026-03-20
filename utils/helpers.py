@@ -174,6 +174,12 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     name_for_ptn = re.sub(r'\[.*?\]', '', name_for_parsing).strip()
     parsed_info = PTN.parse(name_for_ptn)
     
+    # ✅ FIX 1: FORCE SEASON DETECTION
+    if not season_info_str:
+        season_match = re.search(r'\bS(\d{1,2})\b', name, re.IGNORECASE)
+        if season_match:
+            season_info_str = f"S{int(season_match.group(1)):02d}"
+            
     initial_title = parsed_info.get('title', '').strip()
     if not season_info_str and parsed_info.get('season'):
         season_info_str = f"S{parsed_info.get('season'):02d}"
