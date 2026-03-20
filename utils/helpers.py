@@ -225,23 +225,27 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
 
     definitive_title, definitive_year = await get_definitive_title_from_imdb(cleaned_title)
 
-    # Assembly Logic
+    # --- Assembly Logic (FIXED TITLE ISSUE) ---
     final_title = definitive_title if definitive_title else cleaned_title.title()
     final_year = definitive_year if definitive_year else year_from_filename
     is_series = bool(season_info_str or episode_info_str)
     
-    # --- FIX: Pehle title se koi bhi existing Season ya Year hatayein duplication rokne ke liye ---
+    # 1. Pehle title se kisi bhi tarah ke purane Season tags ko hatao
     clean_display_title = re.sub(r'\bS\d{1,2}\b', '', final_title, flags=re.IGNORECASE)
+    
+    # 2. Pehle title se existing Year ko hatao (duplication se bachne ke liye)
     if final_year:
         clean_display_title = re.sub(r'\b' + str(final_year) + r'\b', '', clean_display_title)
     
+    # 3. Cleanup extra spaces jo regex se bani ho
     clean_display_title = re.sub(r'\s+', ' ', clean_display_title).strip()
     
-    # --- FIX: Format assembly ---
+    # 4. Final Format: Title + Season (agar hai)
     display_title_main = clean_display_title
     if is_series and season_info_str:
-        display_title_main += f" {season_info_str}"
+        display_title_main = f"{display_title_main} {season_info_str}"
     
+    # 5. Add Year in brackets at the very end
     if final_year:
         display_title_with_year = f"{display_title_main} ({final_year})"
     else:
@@ -256,7 +260,8 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         "episode_info": episode_info_str,
         "languages": sorted(list(found_languages)),
         "quality_tags": " | ".join(filter(None, [parsed_info.get('resolution'), parsed_info.get('quality'), parsed_info.get('codec')]))
-    }
+        }
+
 
 async def create_post(client, user_id, messages, cache: dict):
     user = await get_user(user_id)
