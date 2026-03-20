@@ -308,10 +308,26 @@ async def create_post(client, user_id, messages, cache: dict):
     for info in media_info_list:
         display_tags_parts = []
 
+        # ✅ EPISODE FIX (only addition)
+        if info.get("is_series") and info.get('episode_info'):
+            numbers = re.findall(r'\d+', info['episode_info'])
+            
+            if len(numbers) == 1:
+                ep_text = f"EP {int(numbers[0]):02d}"
+            elif len(numbers) >= 2:
+                ep_text = f"EP {int(numbers[0]):02d}-{int(numbers[1]):02d}"
+            else:
+                ep_text = ""
+
+            if ep_text:
+                display_tags_parts.append(ep_text)
+
+        # Languages
         languages = info.get('languages', [])
         if languages:
             display_tags_parts.append(" + ".join(languages))
 
+        # Quality
         if info.get('quality_tags'):
             display_tags_parts.append(info['quality_tags'])
 
