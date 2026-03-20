@@ -309,7 +309,7 @@ async def create_post(client, user_id, messages, cache: dict):
         display_tags_parts = []
 
         # ✅ EPISODE FIX (only addition)
-        if info.get("is_series") and info.get('episode_info'):
+        if info.get("season_info") and info.get('episode_info'):
             numbers = re.findall(r'\d+', info['episode_info'])
             
             if len(numbers) == 1:
