@@ -126,7 +126,7 @@ async def get_definitive_title_from_imdb(title_from_filename):
 async def clean_and_parse_filename(name: str, cache: dict = None):
     """
     A next-gen, multi-pass robust filename parser that preserves all metadata.
-    Fixed to ensure Season and Year always show in display_title.
+    Fixed to ensure Season and Year always show in display_title without duplication.
     """
     original_name = name
 
@@ -225,20 +225,23 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
 
     definitive_title, definitive_year = await get_definitive_title_from_imdb(cleaned_title)
 
-    # Final Title selection logic
+    # Assembly Logic
     final_title = definitive_title if definitive_title else cleaned_title.title()
-    final_title = re.sub(r'^[^\w]+', '', final_title).strip()
     final_year = definitive_year if definitive_year else year_from_filename
     is_series = bool(season_info_str or episode_info_str)
     
-    # Cleaning any accidental season tags in the title name itself
-    display_title_main = re.sub(r'\bS\d{1,2}\b', '', final_title, flags=re.IGNORECASE).strip()
+    # --- FIX: Pehle title se koi bhi existing Season ya Year hatayein duplication rokne ke liye ---
+    clean_display_title = re.sub(r'\bS\d{1,2}\b', '', final_title, flags=re.IGNORECASE)
+    if final_year:
+        clean_display_title = re.sub(r'\b' + str(final_year) + r'\b', '', clean_display_title)
     
-    # Ensuring Season is added correctly
+    clean_display_title = re.sub(r'\s+', ' ', clean_display_title).strip()
+    
+    # --- FIX: Format assembly ---
+    display_title_main = clean_display_title
     if is_series and season_info_str:
-        display_title_main = f"{display_title_main} {season_info_str}"
+        display_title_main += f" {season_info_str}"
     
-    # Ensuring Year is added correctly in brackets
     if final_year:
         display_title_with_year = f"{display_title_main} ({final_year})"
     else:
