@@ -192,6 +192,12 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     
     year_from_filename = parsed_info.get('year')
     
+    # ✅ FORCE YEAR DETECTION FIX
+    if not year_from_filename:
+        year_match = re.search(r'\b(19|20)\d{2}\b', name)
+        if year_match:
+            year_from_filename = int(year_match.group(0))
+              
     found_languages = set()
     search_string_lower = name.lower()
     ptn_audio_tags = parsed_info.get('audio', '')
