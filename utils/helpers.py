@@ -126,13 +126,13 @@ async def get_definitive_title_from_imdb(title_from_filename):
 async def clean_and_parse_filename(name: str, cache: dict = None):
     """
     A next-gen, multi-pass robust filename parser that preserves all metadata.
+    Fixed to ensure Season and Year always show in display_title.
     """
     original_name = name
 
     name_for_parsing = name.replace('_', ' ').replace('.', ' ')
     name_for_parsing = re.sub(r'(?:www\.)?[\w-]+\.(?:com|org|net|xyz|me|io|in|cc|biz|world|info|club|mobi|press|top|site|tech|online|store|live|co|shop|fun|tamilmv)\b', '', name_for_parsing, flags=re.IGNORECASE)
     name_for_parsing = re.sub(r'@[a-zA-Z0-9_]+', '', name_for_parsing).strip()
-
 
     season_info_str = ""
     episode_info_str = ""
@@ -186,22 +186,16 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     
     year_from_filename = parsed_info.get('year')
     
-    # --- DECREED MODIFICATION: START ---
-    # Hybrid language detection using PTN's output and our custom map.
     found_languages = set()
     search_string_lower = name.lower()
-    
-    # Also check PTN's audio tag for languages
     ptn_audio_tags = parsed_info.get('audio', '')
     if isinstance(ptn_audio_tags, list):
         ptn_audio_tags = " ".join(ptn_audio_tags)
-    
     search_string_lower += " " + ptn_audio_tags.lower()
     
     for key, value in LANGUAGE_MAP.items():
         if re.search(r'\b' + key + r'\b', search_string_lower):
             found_languages.add(value)
-    # --- DECREED MODIFICATION: END ---
 
     title_to_clean = initial_title
     if year_from_filename:
@@ -231,32 +225,34 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
 
     definitive_title, definitive_year = await get_definitive_title_from_imdb(cleaned_title)
 
+    # Final Title selection logic
     final_title = definitive_title if definitive_title else cleaned_title.title()
     final_title = re.sub(r'^[^\w]+', '', final_title).strip()
-
     final_year = definitive_year if definitive_year else year_from_filename
     is_series = bool(season_info_str or episode_info_str)
     
-    display_title_main = final_title.strip()
-    if is_series and season_info_str and season_info_str not in display_title_main:
-        display_title_main += f" {season_info_str}"
+    # Cleaning any accidental season tags in the title name itself
+    display_title_main = re.sub(r'\bS\d{1,2}\b', '', final_title, flags=re.IGNORECASE).strip()
     
-    display_title_with_year = display_title_main
+    # Ensuring Season is added correctly
+    if is_series and season_info_str:
+        display_title_main = f"{display_title_main} {season_info_str}"
+    
+    # Ensuring Year is added correctly in brackets
     if final_year:
-        display_title_with_year += f" ({final_year})"
+        display_title_with_year = f"{display_title_main} ({final_year})"
+    else:
+        display_title_with_year = display_title_main
         
     return {
         "batch_title": f"{final_title} {season_info_str}".strip(),
-        "display_title": display_title_with_year,
+        "display_title": display_title_with_year.strip(),
         "year": final_year,
         "is_series": is_series,
         "season_info": season_info_str, 
         "episode_info": episode_info_str,
-        # --- DECREED MODIFICATION: START ---
-        # Return detected languages. Audio tag is removed from quality_tags to avoid duplication.
         "languages": sorted(list(found_languages)),
         "quality_tags": " | ".join(filter(None, [parsed_info.get('resolution'), parsed_info.get('quality'), parsed_info.get('codec')]))
-        # --- DECREED MODIFICATION: END ---
     }
 
 async def create_post(client, user_id, messages, cache: dict):
