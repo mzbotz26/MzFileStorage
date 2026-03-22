@@ -96,7 +96,8 @@ async def send_file(client, requester_id, owner_id, file_unique_id):
         file_name_semi_cleaned = re.sub(r'@[a-zA-Z0-9_]+', '', file_name_raw).strip()
         file_name_semi_cleaned = re.sub(r'(www\.|https?://)\S+', '', file_name_semi_cleaned).strip()
         file_name_semi_cleaned = file_name_semi_cleaned.replace('_', ' ')
-
+        file_name_semi_cleaned = re.sub(r'join\s*us', '', file_name_semi_cleaned, flags=re.IGNORECASE)
+        
         filename_url = owner_settings.get("filename_url")
 
         if filename_url:
