@@ -280,15 +280,15 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     # Fallback: filename se extract kar lo
     if not final_year:
         final_year = extract_year_from_filename(original_name)
-    is_series = bool(season_info_str or episode_info_str)
+    is_series = bool(season_info_str) or bool(re.search(r'\bS\d{1,2}\b', name, re.IGNORECASE))
     
     display_title_main = final_title.strip()
     if is_series and season_info_str and season_info_str not in display_title_main:
         display_title_main += f" {season_info_str}"
     
     display_title_with_year = display_title_main
-    if final_year:
-        display_title_with_year += f" ({final_year})"
+    if final_year and f"({final_year})" not in display_title_main:
+    display_title_with_year += f" ({final_year})"
         
     return {
         "batch_title": f"{final_title} {season_info_str}".strip(),
@@ -353,11 +353,6 @@ async def create_post(client, user_id, messages, cache: dict):
         # Quality & Rip handling
         if info.get('quality_tags'):
             display_tags_parts.append(info['quality_tags'])
-        
-        # Codec handling (x264/x265)
-        codec = "x264" # Default if not found
-        if "265" in str(info.get('raw_file_name', '')): codec = "x265"
-        display_tags_parts.append(codec)
         
         display_tags = " | ".join(filter(None, display_tags_parts))
         
