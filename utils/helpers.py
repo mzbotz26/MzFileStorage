@@ -25,6 +25,8 @@ ia = Cinemagoer()
 # A comprehensive map for detecting languages from filenames.
 # This map handles various abbreviations and full names, mapping them to a standard format.
 LANGUAGE_MAP = {
+
+    # 🇮🇳 Indian Languages
     'hin': 'Hindi', 'hindi': 'Hindi',
     'eng': 'English', 'english': 'English',
     'tam': 'Tamil', 'tamil': 'Tamil',
@@ -32,6 +34,16 @@ LANGUAGE_MAP = {
     'mal': 'Malayalam', 'malayalam': 'Malayalam',
     'kan': 'Kannada', 'kannada': 'Kannada',
     'pun': 'Punjabi', 'punjabi': 'Punjabi',
+    'ben': 'Bengali', 'bengali': 'Bengali',
+    'mar': 'Marathi', 'marathi': 'Marathi',
+    'guj': 'Gujarati', 'gujarati': 'Gujarati',
+    'ori': 'Odia', 'odia': 'Odia',
+    'asm': 'Assamese', 'assamese': 'Assamese',
+    'urd': 'Urdu', 'urdu': 'Urdu',
+    'nep': 'Nepali', 'nepali': 'Nepali',
+    'sin': 'Sinhala', 'sinhala': 'Sinhala',
+
+    # 🌍 International Languages
     'jap': 'Japanese', 'japanese': 'Japanese',
     'kor': 'Korean', 'korean': 'Korean',
     'chi': 'Chinese', 'chinese': 'Chinese',
@@ -43,7 +55,26 @@ LANGUAGE_MAP = {
     'ara': 'Arabic', 'arabic': 'Arabic',
     'tur': 'Turkish', 'turkish': 'Turkish',
     'ind': 'Indonesian', 'indonesian': 'Indonesian',
-    'multi': 'Multi-Audio', 'dual': 'Dual-Audio'
+    'por': 'Portuguese', 'portuguese': 'Portuguese',
+    'dut': 'Dutch', 'dutch': 'Dutch',
+    'pol': 'Polish', 'polish': 'Polish',
+    'vie': 'Vietnamese', 'vietnamese': 'Vietnamese',
+    'tha': 'Thai', 'thai': 'Thai',
+    'fil': 'Filipino', 'filipino': 'Filipino',
+    'heb': 'Hebrew', 'hebrew': 'Hebrew',
+    'gre': 'Greek', 'greek': 'Greek',
+    'swe': 'Swedish', 'swedish': 'Swedish',
+    'nor': 'Norwegian', 'norwegian': 'Norwegian',
+    'dan': 'Danish', 'danish': 'Danish',
+    'fin': 'Finnish', 'finnish': 'Finnish',
+
+    # 🎬 Special Tags (important for posts)
+    'multi': 'Multi-Audio',
+    'dual': 'Dual-Audio',
+    'dub': 'Dubbed',
+    'dubbed': 'Dubbed',
+    'org': 'Original Audio',
+    'original': 'Original Audio',
 }
 # --- DECREED ADDITION: END ---
 
