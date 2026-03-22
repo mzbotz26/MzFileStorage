@@ -154,6 +154,16 @@ async def get_definitive_title_from_imdb(title_from_filename):
         logger.error(f"Error fetching data from IMDb for '{title_from_filename}': {e}")
         return None, None
 
+def extract_year_from_filename(filename: str) -> int | None:
+    """
+    Attempts to extract a 4-digit year from the filename.
+    Returns the first match between 1900-2099.
+    """
+    match = re.search(r'\b(19|20)\d{2}\b', filename)
+    if match:
+        return int(match.group(0))
+    return None
+
 async def clean_and_parse_filename(name: str, cache: dict = None):
     """
     A next-gen, multi-pass robust filename parser that preserves all metadata.
