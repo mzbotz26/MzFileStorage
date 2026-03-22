@@ -276,9 +276,6 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     final_title = re.sub(r'^[^\w]+', '', final_title).strip()
 
     final_year = definitive_year if definitive_year else year_from_filename
-    # Existing logic
-    definitive_title, definitive_year = await get_definitive_title_from_imdb(cleaned_title)
-    final_year = definitive_year if definitive_year else parsed_info.get('year')
 
     # Fallback: filename se extract kar lo
     if not final_year:
