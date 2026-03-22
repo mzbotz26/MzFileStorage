@@ -326,8 +326,7 @@ async def create_post(client, user_id, messages, cache: dict):
     
     # Title formatting based on screenshot
     primary_display_title = first_info['display_title']
-    year_str = f" ({first_info['year']})" if first_info.get('year') else ""
-    title_header = f"🏷 **Title: {primary_display_title}{year_str}**"
+    title_header = f"🏷 **Title: {primary_display_title}**"
     
     poster_search_query = first_info['batch_title'].replace(first_info.get('season_info', ''), '').strip()
     post_poster = await get_poster(poster_search_query, first_info['year']) if user.get('show_poster', True) else None
@@ -341,7 +340,7 @@ async def create_post(client, user_id, messages, cache: dict):
     for info in media_info_list:
         display_tags_parts = []
 
-        if info.get('episode_info'):
+        if info.get('is_series') and info.get('episode_info'):
             numbers = re.findall(r'\d+', info['episode_info'])
             ep_text = f"EP {numbers[0]}" if len(numbers) == 1 else f"EP {numbers[0]}-{numbers[1]}" if len(numbers) >= 2 else ""
             if ep_text: display_tags_parts.append(ep_text)
