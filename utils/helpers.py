@@ -326,7 +326,12 @@ async def create_post(client, user_id, messages, cache: dict):
     all_link_entries = []
     for info in media_info_list:
         display_tags_parts = []
-        
+
+        if info.get('episode_info'):
+            numbers = re.findall(r'\d+', info['episode_info'])
+            ep_text = f"EP {numbers[0]}" if len(numbers) == 1 else f"EP {numbers[0]}-{numbers[1]}" if len(numbers) >= 2 else ""
+            if ep_text: display_tags_parts.append(ep_text)
+                
         # Language handling
         languages = info.get('languages', [])
         if languages:
