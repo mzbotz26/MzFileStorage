@@ -157,13 +157,13 @@ async def get_definitive_title_from_imdb(title_from_filename):
 async def clean_and_parse_filename(name: str, cache: dict = None):
     """
     A next-gen, multi-pass robust filename parser that preserves all metadata.
-    Fixed to ensure Season and Year always show in display_title without duplication.
     """
     original_name = name
 
     name_for_parsing = name.replace('_', ' ').replace('.', ' ')
     name_for_parsing = re.sub(r'(?:www\.)?[\w-]+\.(?:com|org|net|xyz|me|io|in|cc|biz|world|info|club|mobi|press|top|site|tech|online|store|live|co|shop|fun|tamilmv)\b', '', name_for_parsing, flags=re.IGNORECASE)
     name_for_parsing = re.sub(r'@[a-zA-Z0-9_]+', '', name_for_parsing).strip()
+
 
     season_info_str = ""
     episode_info_str = ""
@@ -205,12 +205,6 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     name_for_ptn = re.sub(r'\[.*?\]', '', name_for_parsing).strip()
     parsed_info = PTN.parse(name_for_ptn)
     
-    # ✅ FIX 1: FORCE SEASON DETECTION
-    if not season_info_str:
-        season_match = re.search(r'\bS(\d{1,2})\b', name, re.IGNORECASE)
-        if season_match:
-            season_info_str = f"S{int(season_match.group(1)):02d}"
-            
     initial_title = parsed_info.get('title', '').strip()
     if not season_info_str and parsed_info.get('season'):
         season_info_str = f"S{parsed_info.get('season'):02d}"
@@ -223,22 +217,22 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     
     year_from_filename = parsed_info.get('year')
     
-    # ✅ FORCE YEAR DETECTION FIX
-    if not year_from_filename:
-        year_match = re.search(r'\b(?:19|20)\d{2}\b', name)
-        if year_match:
-            year_from_filename = int(year_match.group(0))
-              
+    # --- DECREED MODIFICATION: START ---
+    # Hybrid language detection using PTN's output and our custom map.
     found_languages = set()
     search_string_lower = name.lower()
+    
+    # Also check PTN's audio tag for languages
     ptn_audio_tags = parsed_info.get('audio', '')
     if isinstance(ptn_audio_tags, list):
         ptn_audio_tags = " ".join(ptn_audio_tags)
+    
     search_string_lower += " " + ptn_audio_tags.lower()
     
     for key, value in LANGUAGE_MAP.items():
         if re.search(r'\b' + key + r'\b', search_string_lower):
             found_languages.add(value)
+    # --- DECREED MODIFICATION: END ---
 
     title_to_clean = initial_title
     if year_from_filename:
@@ -256,9 +250,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         'New', 'Combined', 'Complete', 'Chapter', 'PSA', 'JC', 'DIDAR', 'StarBoy',
         'Hindi', 'English', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Japanese', 'Korean',
         'NF', 'AMZN', 'MAX', 'DSNP', 'ZEE5', 'WEB-DL', 'HDRip', 'WEBRip', 'HEVC', 'x265', 'x264', 'AAC',
-        '1tamilmv', 'www', 'Join Us', 'hdcam', 'hdtc', 'cam', 'camrip', 'camprint',
-        'hqcam', 'hallprint', 'prehd', 'predvd', 'pdvd', 'hdts', 'telesync', 'ts',
-        'workprint', 'wp', 'screener', 'dvdscr', 'Tsrip', 'hdtvrip', 'sdtvrip'
+        '1tamilmv', 'www'
     ]
     junk_pattern_re = r'\b(' + r'|'.join(junk_words) + r')\b'
     cleaned_title = re.sub(junk_pattern_re, '', title_to_clean, flags=re.IGNORECASE)
@@ -270,62 +262,40 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
 
     definitive_title, definitive_year = await get_definitive_title_from_imdb(cleaned_title)
 
-    # --- Assembly Logic (FIXED TITLE ISSUE) ---
     final_title = definitive_title if definitive_title else cleaned_title.title()
+    final_title = re.sub(r'^[^\w]+', '', final_title).strip()
+
     final_year = definitive_year if definitive_year else year_from_filename
     is_series = bool(season_info_str or episode_info_str)
     
-    # 1. Pehle title se kisi bhi tarah ke purane Season tags ko hatao
-    clean_display_title = re.sub(r'\bS\d{1,2}\b', '', final_title, flags=re.IGNORECASE)
+    display_title_main = final_title.strip()
+    if is_series and season_info_str and season_info_str not in display_title_main:
+        display_title_main += f" {season_info_str}"
     
-    # 2. Pehle title se existing Year ko hatao (duplication se bachne ke liye)
+    display_title_with_year = display_title_main
     if final_year:
-        clean_display_title = re.sub(r'\b' + str(final_year) + r'\b', '', clean_display_title)
-    
-    # 3. Cleanup extra spaces jo regex se bani ho
-    clean_display_title = re.sub(r'\s+', ' ', clean_display_title).strip()
-    
-    # 4. Final Format: Title + Season (agar hai)
-    display_title_main = clean_display_title
-    if is_series and season_info_str:
-        display_title_main = f"{display_title_main} {season_info_str}"
-    
-    # 5. Add Year in brackets at the very end
-    if final_year:
-        display_title_with_year = f"{display_title_main} ({final_year})"
-    else:
-        display_title_with_year = display_title_main
+        display_title_with_year += f" ({final_year})"
         
-    quality = parsed_info.get('quality') or ""
-
-    # 🔥 ADD QUALITY INTO TITLE
-    display_title_final = display_title_with_year.strip()
-    if quality:
-        display_title_final = f"{display_title_final} {quality.upper()}"
-
     return {
         "batch_title": f"{final_title} {season_info_str}".strip(),
-        "display_title": display_title_final,
+        "display_title": display_title_with_year,
         "year": final_year,
         "is_series": is_series,
         "season_info": season_info_str, 
         "episode_info": episode_info_str,
+        # --- DECREED MODIFICATION: START ---
+        # Return detected languages. Audio tag is removed from quality_tags to avoid duplication.
         "languages": sorted(list(found_languages)),
         "quality_tags": " | ".join(filter(None, [parsed_info.get('resolution'), parsed_info.get('quality'), parsed_info.get('codec')]))
+        # --- DECREED MODIFICATION: END ---
     }
-
+    
 async def create_post(client, user_id, messages, cache: dict):
     user = await get_user(user_id)
-    if not user:
-        return []
+    if not user: return []
 
     media_info_list = []
-
-    parse_tasks = [
-        clean_and_parse_filename(getattr(m, m.media.value, None).file_name, cache)
-        for m in messages if getattr(m, m.media.value, None)
-    ]
-
+    parse_tasks = [clean_and_parse_filename(getattr(m, m.media.value, None).file_name, cache) for m in messages if getattr(m, m.media.value, None)]
     parsed_results = await asyncio.gather(*parse_tasks)
 
     for i, info in enumerate(parsed_results):
@@ -335,116 +305,79 @@ async def create_post(client, user_id, messages, cache: dict):
             info['file_unique_id'] = media.file_unique_id
             media_info_list.append(info)
 
-    if not media_info_list:
-        return []
+    if not media_info_list: return []
 
     media_info_list.sort(key=lambda x: natural_sort_key(x.get('episode_info', '')))
     first_info = media_info_list[0]
+    
+    # Title formatting based on screenshot
     primary_display_title = first_info['display_title']
-
-    poster_search_query = first_info['batch_title'].replace(
-        first_info.get('season_info', ''), ''
-    ).strip()
-
-    post_poster = await get_poster(
-        poster_search_query,
-        first_info['year']
-    ) if user.get('show_poster', True) else None
-
+    year_str = f" ({first_info['year']})" if first_info.get('year') else ""
+    title_header = f"🏷 **Title: {primary_display_title}{year_str}**"
+    
+    poster_search_query = first_info['batch_title'].replace(first_info.get('season_info', ''), '').strip()
+    post_poster = await get_poster(poster_search_query, first_info['year']) if user.get('show_poster', True) else None
+    
     footer_buttons = user.get('footer_buttons', [])
-    footer_keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton(btn['name'], url=btn['url'])] for btn in footer_buttons]
-    ) if footer_buttons else None
-
+    footer_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn['name'], url=btn['url'])] for btn in footer_buttons]) if footer_buttons else None
+    
     CAPTION_LIMIT = PHOTO_CAPTION_LIMIT if post_poster else TEXT_MESSAGE_LIMIT
-
+    
     all_link_entries = []
-
     for info in media_info_list:
         display_tags_parts = []
-
-        # ✅ EPISODE FIX (only addition)
-        if info.get("is_series") and info.get("season_info") and info.get('episode_info'):
-            numbers = re.findall(r'\d+', info['episode_info'])
-            
-            if len(numbers) == 1:
-                ep_text = f"EP {int(numbers[0]):02d}"
-            elif len(numbers) >= 2:
-                ep_text = f"EP {int(numbers[0]):02d}-{int(numbers[1]):02d}"
-            else:
-                ep_text = ""
-
-            if ep_text:
-                display_tags_parts.append(ep_text)
-
-        # Languages
+        
+        # Language handling
         languages = info.get('languages', [])
         if languages:
-            display_tags_parts.append(" + ".join(languages))
+            display_tags_parts.append(" | ".join(languages))
 
-        # Quality
+        # Quality & Rip handling
         if info.get('quality_tags'):
             display_tags_parts.append(info['quality_tags'])
-
+        
+        # Codec handling (x264/x265)
+        codec = "x264" # Default if not found
+        if "265" in str(info.get('raw_file_name', '')): codec = "x265"
+        display_tags_parts.append(codec)
+        
         display_tags = " | ".join(filter(None, display_tags_parts))
-
-        owner_id = user_id
-        file_unique_id = info['file_unique_id']
+        
         bot_username = client.me.username
-
-        deep_link = f"https://t.me/{bot_username}?start=get_{owner_id}_{file_unique_id}"
-        link = deep_link
-
+        link = f"https://t.me/{bot_username}?start=get_{user_id}_{info['file_unique_id']}"
         file_size_str = format_bytes(info['file_size'])
-
-        all_link_entries.append(
-            f"📁 ➤ {display_tags or 'File'}\n"
-            f"📥 ➪ [Click Here]({link}) ({file_size_str})"
+        
+        # New Format with Emojis from screenshot
+        entry = (
+            f"📁 ➤ {display_tags}\n"
+            f"📩 ⇨ [Click Here]({link}) ({file_size_str})"
         )
+        all_link_entries.append(entry)
 
     final_posts = []
+    # Footer with MzMoviiez hyperlink
+    mz_footer = "\n\n💪 **Powered By : [MzMoviiez](https://t.me/MzMoviiez)**"
+    
     current_links_part = []
-
-    base_caption_header = f"🔖 **Title: {primary_display_title}**\n\n"
-    powered_by = "\n\n💪 **Powered By : [MzMoviiez](https://t.me/MzMoviiez)**"
-
-    current_length = len(base_caption_header)
+    # Starting caption with Title
+    base_caption_start = f"{title_header}\n\n"
+    current_length = len(base_caption_start) + len(mz_footer)
 
     for entry in all_link_entries:
         if current_length + len(entry) + 2 > CAPTION_LIMIT and current_links_part:
-            final_caption = (
-                base_caption_header
-                + "\n\n".join(current_links_part)
-                + powered_by
-            )
-
-            final_posts.append(
-                (post_poster if not final_posts else None, final_caption, footer_keyboard)
-            )
-
+            final_caption = base_caption_start + "\n\n".join(current_links_part) + mz_footer
+            final_posts.append((post_poster if not final_posts else None, final_caption, footer_keyboard))
+            
             current_links_part = [entry]
-            current_length = len(base_caption_header) + len(entry)
+            current_length = len(base_caption_start) + len(mz_footer) + len(entry) + 2
         else:
             current_links_part.append(entry)
             current_length += len(entry) + 2
-
+            
     if current_links_part:
-        final_caption = (
-            base_caption_header
-            + "\n\n".join(current_links_part)
-            + powered_by
-        )
-
-        final_posts.append(
-            (post_poster if not final_posts else None, final_caption, footer_keyboard)
-        )
-
-    if len(final_posts) > 1:
-        for i, (poster, cap, foot) in enumerate(final_posts):
-            new_header = f"🔖 **Title: {primary_display_title} (Part {i+1}/{len(final_posts)})**\n\n"
-            new_cap = cap.replace(base_caption_header, new_header)
-            final_posts[i] = (poster, new_cap, foot)
-
+        final_caption = base_caption_start + "\n\n".join(current_links_part) + mz_footer
+        final_posts.append((post_poster if not final_posts else None, final_caption, footer_keyboard))
+            
     return final_posts
 
 def calculate_title_similarity(title1: str, title2: str) -> float:
