@@ -294,17 +294,23 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     else:
         display_title_with_year = display_title_main
         
+    quality = parsed_info.get('quality') or ""
+
+    # 🔥 ADD QUALITY INTO TITLE
+    display_title_final = display_title_with_year.strip()
+    if quality:
+        display_title_final = f"{display_title_final} {quality.upper()}"
+
     return {
         "batch_title": f"{final_title} {season_info_str}".strip(),
-        "display_title": display_title_with_year.strip(),
+        "display_title": display_title_final,
         "year": final_year,
         "is_series": is_series,
         "season_info": season_info_str, 
         "episode_info": episode_info_str,
         "languages": sorted(list(found_languages)),
         "quality_tags": " | ".join(filter(None, [parsed_info.get('resolution'), parsed_info.get('quality'), parsed_info.get('codec')]))
-        }
-
+    }
 
 async def create_post(client, user_id, messages, cache: dict):
     user = await get_user(user_id)
