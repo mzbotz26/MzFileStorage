@@ -250,7 +250,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         'New', 'Combined', 'Complete', 'Chapter', 'PSA', 'JC', 'DIDAR', 'StarBoy',
         'Hindi', 'English', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Japanese', 'Korean',
         'NF', 'AMZN', 'MAX', 'DSNP', 'ZEE5', 'WEB-DL', 'HDRip', 'WEBRip', 'HEVC', 'x265', 'x264', 'AAC',
-        '1tamilmv', 'www'
+        '1tamilmv', 'www', 'Join Us'
     ]
     junk_pattern_re = r'\b(' + r'|'.join(junk_words) + r')\b'
     cleaned_title = re.sub(junk_pattern_re, '', title_to_clean, flags=re.IGNORECASE)
