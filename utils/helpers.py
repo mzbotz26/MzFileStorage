@@ -288,7 +288,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     
     display_title_with_year = display_title_main
     if final_year and f"({final_year})" not in display_title_main:
-    display_title_with_year += f" ({final_year})"
+        display_title_with_year += f" ({final_year})"
         
     return {
         "batch_title": f"{final_title} {season_info_str}".strip(),
