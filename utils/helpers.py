@@ -328,8 +328,8 @@ async def create_post(client, user_id, messages, cache: dict):
     if not media_info_list: return []
 
     def extract_number(s):
-    match = re.search(r'\d+', s or '')
-    return int(match.group()) if match else 0
+        numbers = re.findall(r'\d+', s or '')
+        return int(numbers[-1]) if numbers else 0
 
     media_info_list.sort(key=lambda x: (
         extract_number(x.get('episode_info')),
