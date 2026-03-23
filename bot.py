@@ -266,7 +266,7 @@ class Bot(Client):
                 await self.is_healthy.wait()
 
                 media = getattr(message, message.media.value, None)
-                if media and hasattr(media, 'duration') and media.duration and media.duration < 1200:
+                if media and hasattr(media, 'duration') and media.duration and media.duration < 30:
                     logger.info(f"Skipping short duration file '{media.file_name}' for user {user_id}.")
                     if user_id in self.open_batches:
                         self.open_batches[user_id].setdefault('skipped_files', []).append(media.file_name)
