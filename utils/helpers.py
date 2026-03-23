@@ -322,7 +322,10 @@ async def create_post(client, user_id, messages, cache: dict):
 
     if not media_info_list: return []
 
-    media_info_list.sort(key=lambda x: natural_sort_key(x.get('episode_info', '')))
+    media_info_list.sort(key=lambda x: (
+    natural_sort_key(x.get('episode_info', '')),
+    natural_sort_key(x.get('part_info', ''))
+))
     first_info = media_info_list[0]
     
     # Title formatting based on screenshot
