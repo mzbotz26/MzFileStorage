@@ -174,7 +174,12 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     name_for_parsing = re.sub(r'(?:www\.)?[\w-]+\.(?:com|org|net|xyz|me|io|in|cc|biz|world|info|club|mobi|press|top|site|tech|online|store|live|co|shop|fun|tamilmv)\b', '', name_for_parsing, flags=re.IGNORECASE)
     name_for_parsing = re.sub(r'@[a-zA-Z0-9_]+', '', name_for_parsing).strip()
 
+    part_info = ""
 
+    part_match = re.search(r'part[\s._-]?(\d+)', name, re.IGNORECASE)
+    if part_match:
+        part_info = f"Part {int(part_match.group(1)):02d}"
+    
     season_info_str = ""
     episode_info_str = ""
     raw_episode_text_to_remove = ""
