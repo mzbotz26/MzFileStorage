@@ -339,7 +339,7 @@ async def create_post(client, user_id, messages, cache: dict):
     
     # Title formatting based on screenshot
     primary_display_title = first_info['display_title']
-    title_header = f"🏷 **Title: {primary_display_title}**"
+    title_header = f"🔖 **Title: {primary_display_title}**"
     
     poster_search_query = first_info['batch_title'].replace(first_info.get('season_info', ''), '').strip()
     post_poster = await get_poster(poster_search_query, first_info['year']) if user.get('show_poster', True) else None
@@ -380,7 +380,7 @@ async def create_post(client, user_id, messages, cache: dict):
         # New Format with Emojis from screenshot
         entry = (
             f"📁 ➤ {display_tags}\n"
-            f"📩 ⇨ [Click Here]({link}) ({file_size_str})"
+            f"📥 ➪ [Click Here]({link}) ({file_size_str})"
         )
         all_link_entries.append(entry)
 
