@@ -221,6 +221,9 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     parsed_info = PTN.parse(name_for_ptn)
     
     initial_title = parsed_info.get('title', '').strip()
+    
+    initial_title = re.sub(r'^(?:\d+\s*[-_.]?\s*)+(?=[A-Za-z])', '', initial_title)
+    
     if not season_info_str and parsed_info.get('season'):
         season_info_str = f"S{parsed_info.get('season'):02d}"
     if not episode_info_str and parsed_info.get('episode'):
