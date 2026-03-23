@@ -297,6 +297,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         "is_series": is_series,
         "season_info": season_info_str, 
         "episode_info": episode_info_str,
+        "part_info": part_info,
         # --- DECREED MODIFICATION: START ---
         # Return detected languages. Audio tag is removed from quality_tags to avoid duplication.
         "languages": sorted(list(found_languages)),
@@ -340,6 +341,10 @@ async def create_post(client, user_id, messages, cache: dict):
     for info in media_info_list:
         display_tags_parts = []
 
+        # ✅ SHOW PART INFO
+        if info.get('part_info'):
+            display_tags_parts.append(info['part_info'])
+        
         if info.get('is_series') and info.get('episode_info'):
             numbers = re.findall(r'\d+', info['episode_info'])
             ep_text = f"EP {numbers[0]}" if len(numbers) == 1 else f"EP {numbers[0]}-{numbers[1]}" if len(numbers) >= 2 else ""
