@@ -25,7 +25,10 @@ from features.shortener import validate_shortener, get_shortlink
 from features.poster import get_poster
 from config import Config
 from collections import defaultdict
-from thefuzz import fuzz
+try:
+    from rapidfuzz import fuzz
+except:
+    fuzz = None
 
 logger = logging.getLogger(__name__)
 ACTIVE_BACKUP_TASKS = {} # Changed to a dict to store cancel events
