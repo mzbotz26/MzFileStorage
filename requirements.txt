@@ -4,8 +4,8 @@ motor
 aiohttp
 beautifulsoup4
 pyromod
-# New libraries for fuzzy matching
-thefuzz==0.22.1
+# New libraries for fuzzy matching best and fast
+rapidfuzz
 # New libraries for streaming functionality
 jinja2
 aiofiles
