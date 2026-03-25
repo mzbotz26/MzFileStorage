@@ -12,7 +12,10 @@ from config import Config
 from database.db import get_user, remove_from_list, update_user
 from features.poster import get_poster
 from features.shortener import get_shortlink
-from thefuzz import fuzz
+try:
+    from rapidfuzz import fuzz
+except:
+    fuzz = None
 
 logger = logging.getLogger(__name__)
 
