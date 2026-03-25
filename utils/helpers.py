@@ -288,10 +288,10 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     # Fallback: filename se extract kar lo
     if not final_year:
         final_year = extract_year_from_filename(original_name)
-    is_series = bool(season_info_str) or bool(re.search(r'\bS\d{1,2}\b', name, re.IGNORECASE))
+    is_series = bool(season_info_str) or bool(re.search(r'S\s?0?\d{1,2}', name, re.IGNORECASE))
     
     display_title_main = final_title.strip()
-    if is_series and season_info_str and season_info_str not in display_title_main:
+    if season_info_str and season_info_str not in display_title_main:
         display_title_main += f" {season_info_str}"
     
     display_title_with_year = display_title_main
