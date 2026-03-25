@@ -21,7 +21,10 @@ from database.db import (
     get_monthly_record, update_monthly_record
 )
 from utils.helpers import create_post, clean_and_parse_filename, notify_and_remove_invalid_channel
-from thefuzz import fuzz
+try:
+    from rapidfuzz import fuzz
+except:
+    fuzz = None
 from collections import defaultdict
 
 # Setup logging
