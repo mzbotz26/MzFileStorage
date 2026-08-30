@@ -379,8 +379,16 @@ async def create_post(client, user_id, messages, cache: dict):
         
         display_tags = " | ".join(filter(None, display_tags_parts))
         
-        bot_username = client.me.username
-        link = f"https://t.me/{bot_username}?start=get_{user_id}_{info['file_unique_id']}"
+        owner_id = user_id
+        file_unique_id = info['file_unique_id']
+        
+        # 1. Base64 payload banayein
+        code_string = f"get_{owner_id}_{file_unique_id}"
+        encoded_string = base64.urlsafe_b64encode(code_string.encode("ascii")).decode("ascii").strip("=")
+        
+        # 2. Koyeb Protection Link
+        link = f"{Config.APP_URL.rstrip('/')}/{encoded_string}"
+
         file_size_str = format_bytes(info['file_size'])
         
         # New Format with Emojis from screenshot
