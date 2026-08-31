@@ -34,3 +34,9 @@ class Config:
     # ================================================================= #
     # Yahan apna tutorial video ya channel ka link daalein
     TUTORIAL_URL = os.environ.get("TUTORIAL_URL", "https://t.me/VisionLoverz")
+
+    # ================================================================= #
+    # 🔒 ANTI-BYPASS HMAC SECURITY CONFIGURATION #
+    # ================================================================= #
+    SECRET_KEY = os.environ.get("SECRET_KEY", "mz_super_secret_anti_bypass_key_2026")
+    LINK_EXPIRY = int(os.environ.get("LINK_EXPIRY", "600"))  # 10 minutes
