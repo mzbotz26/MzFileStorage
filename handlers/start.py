@@ -394,7 +394,8 @@ async def handle_public_file_request(client, message, requester_id, payload):
             koyeb_destination = f"{Config.APP_URL.rstrip('/')}/v/{short_id}?sig={sig}___{ts}"
             verify_url = await get_shortlink(koyeb_destination, owner_id, step=current_step)
 
-        tutorial_link = owner_settings.get("how_to_download_link") if owner_settings else None
+        step_tut_key = f"how_to_download_link_{current_step}"
+        tutorial_link = owner_settings.get(step_tut_key) or owner_settings.get("how_to_download_link") if owner_settings else None
         if not tutorial_link:
             tutorial_link = Config.TUTORIAL_URL
 
