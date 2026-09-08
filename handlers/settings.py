@@ -121,41 +121,158 @@ async def get_shortener_menu_parts(user_id):
     if not user: await add_user(user_id); user = await get_user(user_id)
     
     is_enabled = user.get('shortener_enabled', True)
-    shortener_url = user.get('shortener_url')
-    shortener_api = user.get('shortener_api')
     
-    text = "**🔗 Shortener Settings**\n\nAll links are shortened by default using your saved API and Domain."
-    if shortener_url and shortener_api:
-        text += f"\n**Domain:** `{shortener_url}`"
-        text += f"\n**API Key:** `{shortener_api}`"
-    else:
-        text += "\n\n`No shortener domain or API is set.`\n\nShortener is currently disabled."
-        is_enabled = False
-        
+    s1_url = user.get('shortener_url_1') or user.get('shortener_url')
+    s2_url = user.get('shortener_url_2')
+    s3_url = user.get('shortener_url_3')
+    gap_minutes = user.get('verify_gap', 720)
+    
     status_text = 'ON 🟢' if is_enabled else 'OFF 🔴'
-    text += f"\n\n**Status:** {status_text}"
+    
+    text = (
+        "**🔗 3-Step Shortener Settings**\n\n"
+        f"**Status:** {status_text}\n"
+        f"**Verification Gap:** `{gap_minutes}` Minutes (~{int(gap_minutes)//60}h {int(gap_minutes)%60}m)\n\n"
+        f"**1️⃣ Shortener 1:** `{s1_url or 'Not Set'}`\n"
+        f"**2️⃣ Shortener 2:** `{s2_url or 'Not Set'}`\n"
+        f"**3️⃣ Shortener 3:** `{s3_url or 'Not Set'}`\n"
+    )
     
     buttons = [
-        [InlineKeyboardButton(f"Turn Shortener {'OFF' if is_enabled else 'ON'}", callback_data="toggle_shortener")]
+        [InlineKeyboardButton(f"Turn Shortener {'OFF 🔴' if is_enabled else 'ON 🟢'}", callback_data="toggle_shortener")],
+        [InlineKeyboardButton("⏱️ Set Verify Gap Time", callback_data="set_verify_gap")],
+        [
+            InlineKeyboardButton("✏️ Shortener 1", callback_data="set_shortener_1"),
+            InlineKeyboardButton("✏️ Shortener 2", callback_data="set_shortener_2"),
+            InlineKeyboardButton("✏️ Shortener 3", callback_data="set_shortener_3")
+        ],
+        [InlineKeyboardButton("🗑️ Reset All Shorteners", callback_data="reset_shortener")],
+        [go_back_button(user_id).inline_keyboard[0][0]]
     ]
-    
-    buttons.append([InlineKeyboardButton("✏️ Set/Edit API & Domain", callback_data="set_shortener")])
-    
-    if shortener_url or shortener_api:
-        buttons.append([InlineKeyboardButton("🗑️ Reset API & Domain", callback_data="reset_shortener")])
-        
-    buttons.append([go_back_button(user_id).inline_keyboard[0][0]])
     return text, InlineKeyboardMarkup(buttons)
-
 
 @Client.on_callback_query(filters.regex("^reset_shortener$"))
 async def reset_shortener_handler(client, query):
     user_id = query.from_user.id
+    for i in (1, 2, 3):
+        await update_user(user_id, f"shortener_url_{i}", None)
+        await update_user(user_id, f"shortener_api_{i}", None)
     await update_user(user_id, "shortener_url", None)
     await update_user(user_id, "shortener_api", None)
-    await query.answer("✅ Shortener settings have been reset.", show_alert=True)
+    await query.answer("✅ All shortener settings reset.", show_alert=True)
     text, markup = await get_shortener_menu_parts(user_id)
     await safe_edit_message(query, text=text, reply_markup=markup)
+
+
+@Client.on_callback_query(filters.regex("^set_verify_gap$"))
+async def set_verify_gap_handler(client, query):
+    await query.answer()
+    user_id = query.from_user.id
+    prompt_msg = None
+    try:
+        prompt_msg = await query.message.edit_text(
+            "⏱️ **Set Verification Gap Time**\n\n"
+            "Please send the time gap in **minutes**.\n"
+            "After this duration, the user must re-verify.\n\n"
+            "**Examples:**\n"
+            "• `30` (30 Minutes)\n"
+            "• `120` (2 Hours)\n"
+            "• `720` (12 Hours)\n"
+            "• `1440` (24 Hours)",
+            reply_markup=go_back_button(user_id)
+        )
+        msg = await client.listen(chat_id=user_id, timeout=120, filters=filters.text & filters.private)
+        minutes_str = msg.text.strip()
+        await msg.delete()
+        
+        if not minutes_str.isdigit() or int(minutes_str) <= 0:
+            await prompt_msg.edit_text("❌ Invalid input. Please enter numbers greater than 0.", reply_markup=go_back_button(user_id))
+            return
+            
+        minutes = int(minutes_str)
+        await update_user(user_id, "verify_gap", minutes)
+        await prompt_msg.edit_text(f"✅ Verification gap set to **{minutes} Minutes**.")
+        await asyncio.sleep(2)
+        text, markup = await get_shortener_menu_parts(user_id)
+        await safe_edit_message(prompt_msg, text=text, reply_markup=markup)
+    except ListenerTimeout:
+        if prompt_msg: await safe_edit_message(prompt_msg, text="❗️ **Timeout:** Gap setup cancelled.", reply_markup=go_back_button(user_id))
+    except Exception as e:
+        logger.exception("Error setting verify gap")
+        if prompt_msg: await safe_edit_message(prompt_msg, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
+
+
+@Client.on_callback_query(filters.regex(r"^set_shortener(_\d)?$"))
+async def set_shortener_handler(client, query):
+    await query.answer()
+    match = query.data.split("_")
+    step = int(match[2]) if len(match) == 3 else 1
+    asyncio.create_task(set_shortener_logic(client, query, step))
+
+async def set_shortener_logic(client, query, step=1):
+    user_id = query.from_user.id
+    prompt_msg = None
+    domain_msg = None
+    api_msg = None
+    try:
+        prompt_msg = await query.message.edit_text(
+            f"**🔗 Shortener #{step} (Step 1/2): Set Domain**\n\n"
+            "Send your shortener domain (e.g., `droplink.co` or `shareus.io`).",
+            reply_markup=go_back_button(user_id)
+        )
+        
+        domain_msg = await client.listen(chat_id=user_id, timeout=300, filters=filters.text & filters.private)
+        if not domain_msg: return
+        domain = domain_msg.text.strip().replace("https://", "").replace("http://", "").split("/")[0]
+        await domain_msg.delete()
+
+        await prompt_msg.edit_text(
+            f"**🔗 Shortener #{step} (Step 2/2): Set API Key**\n\n"
+            f"Domain: `{domain}`\n"
+            "Now send your API key for this shortener.",
+            reply_markup=go_back_button(user_id)
+        )
+
+        api_msg = await client.listen(chat_id=user_id, timeout=300, filters=filters.text & filters.private)
+        if not api_msg: return
+        api_key = api_msg.text.strip()
+        await api_msg.delete()
+        
+        await prompt_msg.edit_text("⏳ **Testing credentials...**\nPlease wait.")
+        is_valid = await validate_shortener(domain, api_key)
+
+        if is_valid:
+            await update_user(user_id, f"shortener_url_{step}", domain)
+            await update_user(user_id, f"shortener_api_{step}", api_key)
+            if step == 1:
+                await update_user(user_id, "shortener_url", domain)
+                await update_user(user_id, "shortener_api", api_key)
+            await prompt_msg.edit_text(f"✅ **Success!**\n\nShortener #{step} saved successfully.")
+            await asyncio.sleep(2)
+        else:
+            await prompt_msg.edit_text(
+                f"❌ **Validation Failed for Shortener #{step}!**\n\n"
+                "The domain or API key appears invalid.\n\n"
+                "Please verify credentials and try again.",
+                reply_markup=go_back_button(user_id)
+            )
+            return
+
+        text, markup = await get_shortener_menu_parts(user_id)
+        await safe_edit_message(prompt_msg, text=text, reply_markup=markup)
+
+    except ListenerTimeout:
+        if prompt_msg: await safe_edit_message(prompt_msg, text="❗️ **Timeout:** Setup cancelled.", reply_markup=go_back_button(user_id))
+    except Exception as e:
+        logger.exception("Error in set_shortener_logic")
+        if prompt_msg: await safe_edit_message(prompt_msg, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
+    finally:
+        if domain_msg:
+            try: await domain_msg.delete()
+            except: pass
+        if api_msg:
+            try: await api_msg.delete()
+            except: pass
 
 async def get_poster_menu_parts(user_id):
     user = await get_user(user_id)
