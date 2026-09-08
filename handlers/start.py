@@ -5,6 +5,7 @@ import re
 import asyncio
 import time
 import hmac
+import datetime
 import hashlib
 import random
 import string
@@ -30,7 +31,8 @@ from database.db import (
     update_user,
     record_daily_view,
     get_user_verify_step,
-    set_user_verify_step
+    set_user_verify_step,
+    get_verify_log_channel
 )
 from utils.helpers import get_main_menu
 from features.shortener import get_shortlink
