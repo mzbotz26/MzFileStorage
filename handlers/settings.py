@@ -953,23 +953,28 @@ async def remove_footer_handler(client, query):
     await query.answer("Button removed!", show_alert=True)
     await manage_footer_handler(client, query)
 
-@Client.on_callback_query(filters.regex(r"manage_(post|db)_ch"))
+@Client.on_callback_query(filters.regex(r"manage_(post|db|vlog)_ch"))
 async def manage_channels_handler(client, query):
     user_id, ch_type = query.from_user.id, query.data.split("_")[1]
     
     is_post_type = ch_type == 'post'
-    ch_type_name = "Auto Post Channel" if is_post_type else "Database Channel"
-    
-    text = f"**⚙️ Manage Your {ch_type_name}(s)**\n\n"
-    buttons = []
-    
     if is_post_type:
+        ch_type_name = "Auto Post Channel"
         channels = await get_post_channels(user_id)
-        text += "You can add up to 5 auto-post channels."
-    else:
+        limit_text = "You can add up to 5 auto-post channels."
+    elif ch_type == 'db':
+        ch_type_name = "Database Channel"
         db_channel = await get_index_db_channel(user_id)
         channels = [db_channel] if db_channel else []
-        text += "You can only have 1 database channel."
+        limit_text = "You can only have 1 database channel."
+    else:
+        ch_type_name = "Verify Log Channel"
+        vlog_channel = await get_verify_log_channel(user_id)
+        channels = [vlog_channel] if vlog_channel else []
+        limit_text = "All user verification logs will be sent to this channel."
+
+    text = f"**⚙️ Manage Your {ch_type_name}(s)**\n\n{limit_text}"
+    buttons = []
 
     if channels:
         await query.answer("Checking channel status...")
@@ -997,7 +1002,7 @@ async def manage_channels_handler(client, query):
     await safe_edit_message(query, text=text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
-@Client.on_callback_query(filters.regex(r"rm_(post|db)_-?\d+"))
+@Client.on_callback_query(filters.regex(r"rm_(post|db|vlog)_-?\d+"))
 async def remove_channel_handler(client, query):
     _, ch_type, ch_id_str = query.data.split("_")
     user_id = query.from_user.id
@@ -1007,14 +1012,16 @@ async def remove_channel_handler(client, query):
         await remove_from_list(user_id, "post_channels", ch_id)
         deleted_count = await delete_posts_from_channel(user_id, ch_id)
         logger.info(f"Deleted {deleted_count} backed up posts for user {user_id} from channel {ch_id}.")
-    else:
+    elif ch_type == 'db':
         await update_user(user_id, "index_db_channel", None)
+    elif ch_type == 'vlog':
+        await update_user(user_id, "verify_log_channel", None)
         
     await query.answer("Channel removed!", show_alert=True)
     query.data = f"manage_{ch_type}_ch"
     await manage_channels_handler(client, query)
 
-@Client.on_callback_query(filters.regex(r"add_(post|db)_ch"))
+@Client.on_callback_query(filters.regex(r"add_(post|db|vlog)_ch"))
 async def add_channel_prompt(client, query):
     await query.answer()
     asyncio.create_task(add_channel_logic(client, query))
@@ -1028,13 +1035,24 @@ async def add_channel_logic(client, query):
         if len(post_channels) >= 5:
             await client.send_message(user_id, "You have already added the maximum of 5 Auto Post channels.")
             return
-    else:
+    elif ch_type_short == 'db':
         db_channel = await get_index_db_channel(user_id)
         if db_channel:
             await client.send_message(user_id, "You can only have one Database channel. Please remove the existing one first.")
             return
+    elif ch_type_short == 'vlog':
+        vlog_channel = await get_verify_log_channel(user_id)
+        if vlog_channel:
+            await client.send_message(user_id, "You can only have one Verify Log channel. Please remove the existing one first.")
+            return
             
-    ch_type_name = "Auto Post" if is_post_type else "Database"
+    if is_post_type:
+        ch_type_name = "Auto Post"
+    elif ch_type_short == 'db':
+        ch_type_name = "Database"
+    else:
+        ch_type_name = "Verify Log"
+
     prompt_msg = None
     try:
         prompt_msg = await query.message.edit_text(
@@ -1062,8 +1080,10 @@ async def add_channel_logic(client, query):
 
             if ch_type_short == 'post':
                 await set_post_channel(user_id, channel_id)
-            else:
+            elif ch_type_short == 'db':
                 await set_index_db_channel(user_id, channel_id)
+            elif ch_type_short == 'vlog':
+                await set_verify_log_channel(user_id, channel_id)
 
             await response.reply_text(f"✅ Connected to **{response.forward_from_chat.title}** as a {ch_type_name} channel.", reply_markup=go_back_button(user_id))
         else: 
@@ -1072,7 +1092,7 @@ async def add_channel_logic(client, query):
         if prompt_msg: await prompt_msg.delete()
         if response: await response.delete()
         
-    except ListenerTimeout: # --- LEGENDARY FIX: Handle Listener Timeout ---
+    except ListenerTimeout:
         if prompt_msg: await safe_edit_message(prompt_msg, text="❗️ **Timeout:** Command cancelled.", reply_markup=go_back_button(user_id))
     except Exception as e:
         logger.exception("Error in add_channel_prompt")
@@ -1081,7 +1101,6 @@ async def add_channel_logic(client, query):
         if 'response' in locals() and response:
             try: await response.delete()
             except: pass
-
 
 @Client.on_callback_query(filters.regex("^set_filename_link$"))
 async def set_filename_link_handler(client, query):
@@ -1181,76 +1200,3 @@ async def fsub_and_download_logic(client, query):
             try: await response.delete()
             except: pass
 
-# --- Replacement for Old Handler at the very end of file ---
-
-@Client.on_callback_query(filters.regex(r"^set_shortener(_\d)?$"))
-async def set_shortener_handler(client, query):
-    await query.answer()
-    match = query.data.split("_")
-    step = int(match[2]) if len(match) == 3 else 1
-    asyncio.create_task(set_shortener_logic(client, query, step))
-
-async def set_shortener_logic(client, query, step=1):
-    user_id = query.from_user.id
-    prompt_msg = None
-    domain_msg = None
-    api_msg = None
-    try:
-        prompt_msg = await query.message.edit_text(
-            f"**🔗 Shortener #{step} (Step 1/2): Set Domain**\n\n"
-            "Send your shortener domain (e.g., `droplink.co` or `shareus.io`).",
-            reply_markup=go_back_button(user_id)
-        )
-        
-        domain_msg = await client.listen(chat_id=user_id, timeout=300, filters=filters.text & filters.private)
-        if not domain_msg: return
-        domain = domain_msg.text.strip().replace("https://", "").replace("http://", "").split("/")[0]
-        await domain_msg.delete()
-
-        await prompt_msg.edit_text(
-            f"**🔗 Shortener #{step} (Step 2/2): Set API Key**\n\n"
-            f"Domain: `{domain}`\n"
-            "Now send your API key for this shortener.",
-            reply_markup=go_back_button(user_id)
-        )
-
-        api_msg = await client.listen(chat_id=user_id, timeout=300, filters=filters.text & filters.private)
-        if not api_msg: return
-        api_key = api_msg.text.strip()
-        await api_msg.delete()
-        
-        await prompt_msg.edit_text("⏳ **Testing credentials...**\nPlease wait.")
-        is_valid = await validate_shortener(domain, api_key)
-
-        if is_valid:
-            await update_user(user_id, f"shortener_url_{step}", domain)
-            await update_user(user_id, f"shortener_api_{step}", api_key)
-            if step == 1:
-                await update_user(user_id, "shortener_url", domain)
-                await update_user(user_id, "shortener_api", api_key)
-            await prompt_msg.edit_text(f"✅ **Success!**\n\nShortener #{step} saved successfully.")
-            await asyncio.sleep(2)
-        else:
-            await prompt_msg.edit_text(
-                f"❌ **Validation Failed for Shortener #{step}!**\n\n"
-                "The domain or API key appears invalid.\n\n"
-                "Please verify credentials and try again.",
-                reply_markup=go_back_button(user_id)
-            )
-            return
-
-        text, markup = await get_shortener_menu_parts(user_id)
-        await safe_edit_message(prompt_msg, text=text, reply_markup=markup)
-
-    except ListenerTimeout:
-        if prompt_msg: await safe_edit_message(prompt_msg, text="❗️ **Timeout:** Setup cancelled.", reply_markup=go_back_button(user_id))
-    except Exception as e:
-        logger.exception("Error in set_shortener_logic")
-        if prompt_msg: await safe_edit_message(prompt_msg, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
-    finally:
-        if domain_msg:
-            try: await domain_msg.delete()
-            except: pass
-        if api_msg:
-            try: await api_msg.delete()
-            except: pass
