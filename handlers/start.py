@@ -422,7 +422,7 @@ async def handle_public_file_request(client, message, requester_id, payload):
         ]
 
         return await message.reply_text(
-            f"🔒 **Access Restricted{title_step_text}**\n\n"
+            f"🔒 **Access Restricted**\n\n"
             "To unlock this file, you must complete a quick verification.\n\n"
             "👇 Click below to continue:",
             reply_markup=InlineKeyboardMarkup(buttons),
