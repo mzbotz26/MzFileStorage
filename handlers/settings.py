@@ -18,7 +18,8 @@ from database.db import (
     get_all_user_files, get_paginated_files, search_user_files,
     add_user, set_post_channel, set_index_db_channel, get_index_db_channel,
     get_posts_for_backup, delete_posts_from_channel, add_backup_channel,
-    get_backup_channels, remove_backup_channel, get_post_channels
+    get_backup_channels, remove_backup_channel, get_post_channels, 
+    set_verify_log_channel, get_verify_log_channel
 )
 from utils.helpers import go_back_button, get_main_menu, create_post, clean_and_parse_filename, calculate_title_similarity, notify_and_remove_invalid_channel, format_bytes, PHOTO_CAPTION_LIMIT, TEXT_MESSAGE_LIMIT
 from features.shortener import validate_shortener, get_shortlink
@@ -346,6 +347,7 @@ async def manage_channels_submenu_handler(client, query):
     buttons = [
         [InlineKeyboardButton("➕ Manage Auto Post Channels", callback_data="manage_post_ch")],
         [InlineKeyboardButton("🗃️ Manage Database Channel", callback_data="manage_db_ch")],
+        [InlineKeyboardButton("📝 Manage Verify Log Channel", callback_data="manage_vlog_ch")],
         [go_back_button(query.from_user.id).inline_keyboard[0][0]]
     ]
     markup = InlineKeyboardMarkup(buttons)
