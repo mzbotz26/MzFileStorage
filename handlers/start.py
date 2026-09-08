@@ -438,14 +438,12 @@ async def handle_public_file_request(client, message, requester_id, payload):
             elif owner_settings.get("shortener_url_2") and owner_settings.get("shortener_api_2"):
                 total_steps = 2
 
-        btn_text = f"🔐 Verify Step {current_step}/{total_steps}" if total_steps > 1 else "🔐 Verify Now"
+        btn_text = "🔐 Verify Now"
 
         buttons = [
             [InlineKeyboardButton(btn_text, url=verify_url)],
             [InlineKeyboardButton("📖 How To Verify", url=tutorial_link)]
         ]
-
-        title_step_text = f" (Step {current_step}/{total_steps})" if total_steps > 1 else ""
 
         return await message.reply_text(
             f"🔒 **Access Restricted{title_step_text}**\n\n"
