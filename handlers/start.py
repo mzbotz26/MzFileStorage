@@ -202,7 +202,7 @@ async def start_command(client, message):
         payload = message.command[1]
 
         try:
-            # ================= VERIFY HANDLER (3-STEP SUPPORT) =================
+            # ================= VERIFY HANDLER (STEP-WISE LOGS) =================
             if payload.startswith("verify_"):
                 _, owner_id_str, file_unique_id = payload.split("_", 2)
                 owner_id = int(owner_id_str)
@@ -217,8 +217,36 @@ async def start_command(client, message):
                         total_steps = 2
 
                 current_step = await get_user_verify_step(owner_id, requester_id)
+                vlog_ch = await get_verify_log_channel(owner_id)
+                file_obj = await get_file_by_unique_id(owner_id, file_unique_id)
+                fname = file_obj.get("file_name", "Unknown File") if file_obj else "Unknown"
 
+                # STEP-BY-STEP LOG FUNCTION
+                async def send_step_log(step_num, is_final=False):
+                    if not vlog_ch:
+                        return
+                    try:
+                        status_text = "🎉 **Final Verification Complete!**" if is_final else f"⚡️ **Shortener Step {step_num} Passed!**"
+                        log_msg = (
+                            f"{status_text}\n\n"
+                            f"👤 **User:** {message.from_user.mention} (`{requester_id}`)\n"
+                            f"📁 **File:** `{fname}`\n"
+                            f"🔢 **Step:** `{step_num}/{total_steps}`\n"
+                            f"📅 **Time:** `{datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC`"
+                        )
+                        if is_final:
+                            gap_mins = owner_settings.get('verify_gap', 720) if owner_settings else 720
+                            log_msg += f"\n⏱ **Access Valid:** `{gap_mins} Minutes`"
+                        
+                        await client.send_message(vlog_ch, log_msg)
+                    except Exception as err:
+                        logger.warning(f"Could not send log to channel: {err}")
+
+                # Check agar abhi next shortener baaki hai
                 if current_step < total_steps:
+                    # Current step pass hone ka log channel me bhejein
+                    await send_step_log(current_step, is_final=False)
+
                     next_step = current_step + 1
                     await set_user_verify_step(owner_id, requester_id, next_step)
                     await message.reply_text(
@@ -229,7 +257,9 @@ async def start_command(client, message):
                     await handle_public_file_request(client, message, requester_id, f"get_{owner_id}_{file_unique_id}")
                     return
 
-                # All steps verified
+                # Aakhri (Final) shortener pass hone ka log bhejein
+                await send_step_log(total_steps, is_final=True)
+
                 await claim_verification_for_file(owner_id, file_unique_id, requester_id)
                 gap_mins = owner_settings.get('verify_gap', 720) if owner_settings else 720
 
