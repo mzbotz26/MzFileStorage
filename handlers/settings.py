@@ -1185,63 +1185,60 @@ async def fsub_and_download_logic(client, query):
             try: await response.delete()
             except: pass
 
+# --- Replacement for Old Handler at the very end of file ---
 
-@Client.on_callback_query(filters.regex("^set_shortener$"))
+@Client.on_callback_query(filters.regex(r"^set_shortener(_\d)?$"))
 async def set_shortener_handler(client, query):
     await query.answer()
-    asyncio.create_task(set_shortener_logic(client, query))
+    match = query.data.split("_")
+    step = int(match[2]) if len(match) == 3 else 1
+    asyncio.create_task(set_shortener_logic(client, query, step))
 
-async def set_shortener_logic(client, query):
+async def set_shortener_logic(client, query, step=1):
     user_id = query.from_user.id
     prompt_msg = None
     domain_msg = None
     api_msg = None
     try:
         prompt_msg = await query.message.edit_text(
-            "**🔗 Step 1/2: Set Domain**\n\n"
-            "Please send your shortener website's domain name (e.g., `example.com`).",
+            f"**🔗 Shortener #{step} (Step 1/2): Set Domain**\n\n"
+            "Send your shortener domain (e.g., `droplink.co` or `shareus.io`).",
             reply_markup=go_back_button(user_id)
         )
         
         domain_msg = await client.listen(chat_id=user_id, timeout=300, filters=filters.text & filters.private)
-        
-        if not domain_msg: 
-             # This case is now handled by the ListenerTimeout exception
-             return
-
-        domain = domain_msg.text.strip()
+        if not domain_msg: return
+        domain = domain_msg.text.strip().replace("https://", "").replace("http://", "").split("/")[0]
         await domain_msg.delete()
 
         await prompt_msg.edit_text(
-            f"**🔗 Step 2/2: Set API Key**\n\n"
+            f"**🔗 Shortener #{step} (Step 2/2): Set API Key**\n\n"
             f"Domain: `{domain}`\n"
-            "Now, please send your API key.",
+            "Now send your API key for this shortener.",
             reply_markup=go_back_button(user_id)
         )
 
         api_msg = await client.listen(chat_id=user_id, timeout=300, filters=filters.text & filters.private)
-
-        if not api_msg: 
-             # This case is now handled by the ListenerTimeout exception
-             return
-
+        if not api_msg: return
         api_key = api_msg.text.strip()
         await api_msg.delete()
         
-        await prompt_msg.edit_text("⏳ **Testing your credentials...**\nPlease wait a moment.")
+        await prompt_msg.edit_text("⏳ **Testing credentials...**\nPlease wait.")
         is_valid = await validate_shortener(domain, api_key)
 
         if is_valid:
-            await update_user(user_id, "shortener_url", domain)
-            await update_user(user_id, "shortener_api", api_key)
-            await prompt_msg.edit_text("✅ **Success!**\n\nYour shortener has been verified and saved.")
-            await asyncio.sleep(3)
+            await update_user(user_id, f"shortener_url_{step}", domain)
+            await update_user(user_id, f"shortener_api_{step}", api_key)
+            if step == 1:
+                await update_user(user_id, "shortener_url", domain)
+                await update_user(user_id, "shortener_api", api_key)
+            await prompt_msg.edit_text(f"✅ **Success!**\n\nShortener #{step} saved successfully.")
+            await asyncio.sleep(2)
         else:
             await prompt_msg.edit_text(
-                "❌ **Validation Failed!**\n\n"
-                "The domain or API key you provided appears to be incorrect. "
-                "Your settings have **not** been saved.\n\n"
-                "Please check your credentials and try again.",
+                f"❌ **Validation Failed for Shortener #{step}!**\n\n"
+                "The domain or API key appears invalid.\n\n"
+                "Please verify credentials and try again.",
                 reply_markup=go_back_button(user_id)
             )
             return
@@ -1249,10 +1246,10 @@ async def set_shortener_logic(client, query):
         text, markup = await get_shortener_menu_parts(user_id)
         await safe_edit_message(prompt_msg, text=text, reply_markup=markup)
 
-    except ListenerTimeout: # --- LEGENDARY FIX: Handle Listener Timeout ---
-        if prompt_msg: await safe_edit_message(prompt_msg, text="❗️ **Timeout:** Command cancelled.", reply_markup=go_back_button(user_id))
+    except ListenerTimeout:
+        if prompt_msg: await safe_edit_message(prompt_msg, text="❗️ **Timeout:** Setup cancelled.", reply_markup=go_back_button(user_id))
     except Exception as e:
-        logger.exception("Error in set_shortener_handler")
+        logger.exception("Error in set_shortener_logic")
         if prompt_msg: await safe_edit_message(prompt_msg, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
     finally:
         if domain_msg:
