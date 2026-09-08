@@ -368,4 +368,14 @@ async def get_posts_for_backup(owner_id, post_channel_id):
 async def delete_posts_from_channel(owner_id, post_channel_id):
     result = await posts.delete_many({'owner_id': owner_id, 'post_channel_id': post_channel_id})
     return result.deleted_count
+
+async def set_verify_log_channel(user_id: int, channel_id: int):
+    """Saves the verify log channel ID for the storage owner."""
+    await users.update_one({'user_id': user_id}, {'$set': {'verify_log_channel': channel_id}}, upsert=True)
+
+async def get_verify_log_channel(user_id: int):
+    """Retrieves the verify log channel ID for a storage owner."""
+    user = await users.find_one({'user_id': user_id})
+    return user.get('verify_log_channel') if user else None
+                         
   
