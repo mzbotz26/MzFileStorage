@@ -316,20 +316,27 @@ async def how_to_download_menu_handler(client, query):
     user = await get_user(user_id)
     if not user: await add_user(user_id); user = await get_user(user_id)
 
-    download_link = user.get("how_to_download_link")
+    l1 = user.get("how_to_download_link_1") or user.get("how_to_download_link") or "Not Set"
+    l2 = user.get("how_to_download_link_2") or "Not Set"
+    l3 = user.get("how_to_download_link_3") or "Not Set"
 
-    text = "**❓ How to Download Link Settings**\n\n"
-    if download_link:
-        text += f"Your current 'How to Download' tutorial link is:\n`{download_link}`"
-    else:
-        text += "You have not set a 'How to Download' link yet."
+    text = (
+        "**❓ How to Download (Tutorial) Settings**\n\n"
+        "Set step-wise tutorial video links for your shorteners:\n\n"
+        f"**1️⃣ Step 1 Tutorial:** `{l1}`\n"
+        f"**2️⃣ Step 2 Tutorial:** `{l2}`\n"
+        f"**3️⃣ Step 3 Tutorial:** `{l3}`\n"
+    )
 
     buttons = [
-        [InlineKeyboardButton("✏️ Set/Change Link", callback_data="set_download")],
+        [
+            InlineKeyboardButton("✏️ Step 1", callback_data="set_download_1"),
+            InlineKeyboardButton("✏️ Step 2", callback_data="set_download_2"),
+            InlineKeyboardButton("✏️ Step 3", callback_data="set_download_3")
+        ],
         [go_back_button(user_id).inline_keyboard[0][0]]
     ]
     await safe_edit_message(query, text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
-
 
 # --- Main Callback Handlers ---
 
@@ -1093,14 +1100,16 @@ async def set_filename_link_handler(client, query):
     except:
         logger.exception("Error in set_filename_link_handler"); await safe_edit_message(query, text="An error occurred.", reply_markup=go_back_button(user_id))
 
-@Client.on_callback_query(filters.regex("^(set_fsub|set_download|remove_fsub)$"))
+@Client.on_callback_query(filters.regex(r"^(set_fsub|set_download(_\d)?|remove_fsub)$"))
 async def fsub_and_download_handler(client, query):
     await query.answer()
     asyncio.create_task(fsub_and_download_logic(client, query))
 
 async def fsub_and_download_logic(client, query):
     user_id = query.from_user.id
-    action = query.data.split("_")[1]
+    data_parts = query.data.split("_")
+    action = data_parts[1] # 'fsub' ya 'download'
+    step = int(data_parts[2]) if len(data_parts) == 3 else 1
 
     if action == "fsub" and query.data == "remove_fsub":
         await update_user(user_id, "fsub_channel", None)
@@ -1109,79 +1118,64 @@ async def fsub_and_download_logic(client, query):
         await safe_edit_message(query, text, reply_markup=markup)
         return
 
-    prompts = {
-        "fsub": ("📢 **Set FSub**\n\nForward a message from your FSub channel. I must be an admin there to work correctly.", "fsub_channel"),
-        "download": ("❓ **Set 'How to Download'**\n\nSend your tutorial URL.", "how_to_download_link")
-    }
-    prompt_text, key = prompts[action]
+    key = "fsub_channel" if action == "fsub" else f"how_to_download_link_{step}"
     
     prompt = None
     response = None
     try:
-        initial_text = prompt_text
-        if action == "download":
+        if action == "fsub":
+            initial_text = "📢 **Set FSub**\n\nForward a message from your FSub channel. I must be an admin there to work correctly."
+            listen_filters = filters.forwarded
+        else:
             user = await get_user(user_id)
-            if user and user.get(key):
-                initial_text += f"\n\n**Current Link:** `{user.get(key)}`"
+            current_link = user.get(key) if user else None
+            initial_text = f"❓ **Set Step {step} 'How to Download' Link**\n\nSend your tutorial URL."
+            if current_link:
+                initial_text += f"\n\n**Current Link:** `{current_link}`"
+            listen_filters = filters.text
+
         prompt = await query.message.edit_text(initial_text, reply_markup=go_back_button(user_id), disable_web_page_preview=True)
-        
-        listen_filters = filters.forwarded if action == "fsub" else filters.text
         response = await client.listen(chat_id=user_id, timeout=300, filters=listen_filters)
         
         if action == "fsub":
             if not response.forward_from_chat:
                 await safe_edit_message(prompt, "This is not a valid forwarded message from a channel.", reply_markup=go_back_button(user_id))
                 return
-            
             channel_id = response.forward_from_chat.id
             await safe_edit_message(prompt, "⏳ Checking permissions in the channel...")
-            
             try:
                 member = await client.get_chat_member(channel_id, "me")
                 if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
                     raise UserNotParticipant
             except (UserNotParticipant, ChannelPrivate, ChatAdminRequired) as e:
-                logger.error(f"FSub permission check failed for user {user_id}, channel {channel_id}: {e}")
-                await safe_edit_message(prompt, 
-                    "❌ **Permission Denied!**\n\nThe channel is private or I'm not an admin there. "
-                    "Please make sure I am a member of the channel and have been promoted to an admin, then try again.",
-                    reply_markup=go_back_button(user_id)
-                )
+                await safe_edit_message(prompt, "❌ **Permission Denied!** Make me admin first.", reply_markup=go_back_button(user_id))
                 return
 
             await update_user(user_id, key, channel_id)
-            await safe_edit_message(prompt, f"✅ **Success!** FSub channel updated to **{response.forward_from_chat.title}**.")
+            await safe_edit_message(prompt, f"✅ **Success!** FSub channel updated.")
             await asyncio.sleep(2)
             text, markup = await get_fsub_menu_parts(client, user_id)
             await safe_edit_message(prompt, text, reply_markup=markup)
-        
         else:
             url_to_check = response.text.strip()
-            if not url_to_check.startswith(("http://", "https://")): url_to_check = "https://" + url_to_check
-            await safe_edit_message(prompt, f"⏳ **Validating URL...**\n`{url_to_check}`")
-            
-            is_valid = False
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.head(url_to_check, timeout=5, allow_redirects=True) as resp:
-                        if resp.status in range(200, 400): is_valid = True
-            except Exception as e: logger.error(f"URL validation failed for {url_to_check}: {e}")
+            if not url_to_check.startswith(("http://", "https://")): 
+                url_to_check = "https://" + url_to_check
+                
+            await update_user(user_id, key, url_to_check)
+            if step == 1:
+                await update_user(user_id, "how_to_download_link", url_to_check)
+                
+            await safe_edit_message(prompt, f"✅ **Success!** Step {step} tutorial link saved.")
+            await asyncio.sleep(2)
+            await how_to_download_menu_handler(client, query)
 
-            if is_valid:
-                await update_user(user_id, key, url_to_check)
-                await safe_edit_message(prompt, "✅ **Success!** Your 'How to Download' link has been saved.")
-                await asyncio.sleep(2)
-                await how_to_download_menu_handler(client, query)
-            else:
-                await safe_edit_message(prompt, "❌ **Validation Failed!**\n\nThe URL you provided is invalid or inaccessible. Your settings have not been saved.", reply_markup=go_back_button(user_id))
-
-    except ListenerTimeout: # --- LEGENDARY FIX: Handle Listener Timeout ---
+    except ListenerTimeout:
         if prompt: await safe_edit_message(prompt, text="❗️ **Timeout:** Cancelled.", reply_markup=go_back_button(user_id))
     except Exception as e:
         logger.exception("Error in handler")
         if prompt: await safe_edit_message(prompt, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
     finally:
-        if response: 
+        if response:
             try: await response.delete()
             except: pass
 
