@@ -22,8 +22,13 @@ logger = logging.getLogger(__name__)
 PHOTO_CAPTION_LIMIT = 1024
 TEXT_MESSAGE_LIMIT = 4096
 
-ia = Cinemagoer(accessSystem='http')
-
+# Safe Cinemagoer Initialization (Crash Protection)
+try:
+    ia = Cinemagoer()
+except Exception as e:
+    logger.warning(f"Cinemagoer init failed: {e}")
+    ia = None
+    
 # --- DECREED ADDITION: START ---
 # A comprehensive map for detecting languages from filenames.
 # This map handles various abbreviations and full names, mapping them to a standard format.
