@@ -454,8 +454,12 @@ async def handle_public_file_request(client, message, requester_id, payload):
             rem_mins = int(rem_seconds // 60)
             if rem_mins > 0:
                 await message.reply_text(
-                    f"⚡️ <b>Access Active!</b>\n\n"
-                    f"⏳ Aapka verification valid hai: <b>{rem_mins} Minutes</b> bache hain.",
+                    f"💎 <b>VIP Access Unlocked</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ <b>Validity:</b> <code>{rem_mins} Minutes</code>\n"
+                    f"⚡️ <b>Mode:</b> Instant Download (Ad-Free)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"<i>Enjoy your streaming & downloads!</i>",
                     parse_mode=enums.ParseMode.HTML
                 )
 
