@@ -239,43 +239,44 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     
     year_from_filename = parsed_info.get('year')
     
-    # --- 1. DIRECT & ROBUST LANGUAGE DETECTION ---
-    found_languages = set()
-    cleaned_name_for_lang = original_name.replace('.', ' ').replace('_', ' ').replace('-', ' ').lower()
-    
-    ptn_audio_tags = parsed_info.get('audio', '')
-    if isinstance(ptn_audio_tags, list):
-        ptn_audio_tags = " ".join(ptn_audio_tags)
-    cleaned_name_for_lang += " " + ptn_audio_tags.lower()
-    
-    for key, value in LANGUAGE_MAP.items():
-        if re.search(r'\b' + re.escape(key) + r'\b', cleaned_name_for_lang):
-            found_languages.add(value)
-
-    # --- 2. DIRECT & ROBUST QUALITY / RIP EXTRACTION ---
+    # --- UNIVERSAL QUALITY & METADATA EXTRACTOR ---
     extracted_tags = []
     
-    # Resolution (e.g., 480p, 576p, 720p, 1080p, 2160p, 4k)
-    res_match = re.search(r'\b(480p|576p|720p|1080p|2160p|4k)\b', original_name, re.IGNORECASE)
+    # 1. Resolution
+    res_match = re.search(r'\b(480p|576p|720p|1080p|2160p|4k|uhd)\b', original_name, re.IGNORECASE)
     if res_match:
         extracted_tags.append(res_match.group(1).lower())
     elif parsed_info.get('resolution'):
         extracted_tags.append(str(parsed_info.get('resolution')).lower())
 
-    # Source / Rip (e.g., WEB-DL, WEBRip, HDRip, BluRay, BDRip, DVDRip, HDTC, HDCAM)
-    source_match = re.search(r'\b(WEB-?DL|WEBRip|HDRip|BluRay|BDRip|DVDRip|HDTC|HDCAM)\b', original_name, re.IGNORECASE)
+    # 2. Source / Rip Type (WEB-DL, WEBRip, BluRay, etc.)
+    source_match = re.search(r'(WEB[\.\-_]?DL|WEB[\.\-_]?Rip|BluRay|BRRip|BDRip|HD[\.\-_]?Rip|DVDRip|HDTC|HDCAM|PreDVD)', original_name, re.IGNORECASE)
     if source_match:
-        src_clean = source_match.group(1).upper().replace('WEBDL', 'WEB-DL')
-        extracted_tags.append(src_clean)
+        s = source_match.group(1).upper()
+        if "WEB" in s and "DL" in s:
+            s = "WEB-DL"
+        elif "WEB" in s and "RIP" in s:
+            s = "WEBRip"
+        elif "BLU" in s or "BR" in s or "BD" in s:
+            s = "BluRay"
+        extracted_tags.append(s)
     elif parsed_info.get('quality'):
         extracted_tags.append(str(parsed_info.get('quality')).upper())
 
-    # Codec (Optional - e.g., H.264, x264, HEVC, H.265)
-    codec_match = re.search(r'\b(H\.?264|H\.?265|HEVC|x264|x265)\b', original_name, re.IGNORECASE)
+    # 3. Codec (H.264, x264, HEVC, etc.)
+    codec_match = re.search(r'(H[\.\s]?264|H[\.\s]?265|x264|x265|HEVC)', original_name, re.IGNORECASE)
     if codec_match:
-        extracted_tags.append(codec_match.group(1).upper())
+        c = codec_match.group(1).upper().replace(' ', '.')
+        extracted_tags.append(c)
 
-    # Vertical bar divider for quality tags
+    # 4. Audio Quality & Audio Flags (Dual/Multi/5.1)
+    audio_match = re.search(r'(DD[\+]?[\.\s]?5\.1|Atmos|AAC[\.\s]?2\.0|Dual[\.\s\-_]?Audio|Multi[\.\s\-_]?Audio)', original_name, re.IGNORECASE)
+    if audio_match:
+        a = audio_match.group(1).title().replace(' ', '.')
+        if "Dual" in a: a = "Dual-Audio"
+        if "Multi" in a: a = "Multi-Audio"
+        extracted_tags.append(a)
+
     quality_tags_str = " | ".join(extracted_tags) if extracted_tags else "HD"
 
     title_to_clean = initial_title
