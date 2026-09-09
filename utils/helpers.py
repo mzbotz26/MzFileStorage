@@ -412,7 +412,7 @@ async def create_post(client, user_id, messages, cache: dict):
         all_link_entries.append(entry)
 
     final_posts = []
-    mz_footer = "\n\n💪 **Powered By : [MzMoviiez](https://t.me/MzMoviiez)**"
+    mz_footer = "\n\n💪 **Powered By : [𝐌𝐳𝐌𝐨𝐯𝐢𝐢𝐞𝐳](https://t.me/MzMoviiez)**"
     
     current_links_part = []
     base_caption_start = f"{title_header}\n\n"
