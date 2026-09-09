@@ -14,7 +14,7 @@ from features.shortener import get_shortlink
 
 try:
     from imdb import Cinemagoer
-    ia = Cinemagoer('http')
+    ia = Cinemagoer()
 except Exception:
     try:
         ia = Cinemagoer()
