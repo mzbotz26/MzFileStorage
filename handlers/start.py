@@ -444,6 +444,21 @@ async def handle_public_file_request(client, message, requester_id, payload):
     # VERIFIED → RECORD STATS + SEND FILE
     # ===============================
     await record_daily_view(owner_id, requester_id)
+    
+    # Agar user abhi verification gap ke andar hai, toh time alert dikhayein
+    from database.db import verified_users
+    v_data = await verified_users.find_one({"owner_id": owner_id, "requester_id": requester_id})
+    if v_data and "expires_at" in v_data:
+        rem_seconds = (v_data["expires_at"] - datetime.datetime.utcnow()).total_seconds()
+        if rem_seconds > 0:
+            rem_mins = int(rem_seconds // 60)
+            if rem_mins > 0:
+                await message.reply_text(
+                    f"⚡️ <b>Access Active!</b>\n\n"
+                    f"⏳ Aapka verification valid hai: <b>{rem_mins} Minutes</b> bache hain.",
+                    parse_mode=enums.ParseMode.HTML
+                )
+
     await send_file(client, requester_id, owner_id, file_unique_id)
 
 
