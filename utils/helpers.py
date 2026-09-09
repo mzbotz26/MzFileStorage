@@ -16,10 +16,7 @@ try:
     from imdb import Cinemagoer
     ia = Cinemagoer()
 except Exception:
-    try:
-        ia = Cinemagoer()
-    except Exception:
-        ia = None
+    ia = None
 
 try:
     from rapidfuzz import fuzz
