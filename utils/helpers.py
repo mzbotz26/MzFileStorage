@@ -461,4 +461,21 @@ async def get_main_menu(user_id):
         [InlineKeyboardButton("🔗 Shortener", callback_data="shortener_menu"), InlineKeyboardButton("🔄 Backup", callback_data="backup_links")],
         [InlineKeyboardButton("✍️ Filename Link", callback_data="filename_link_menu"), InlineKeyboardButton("👣 Footer Buttons", callback_data="manage_footer")],
         [InlineKeyboardButton("🖼️ IMDb Poster", callback_data="poster_menu"), InlineKeyboardButton("📂 My Files", callback_data="my_files_1")],
-        [InlineKeyboardButton("📢 FSub", callback_data="fsub_menu"), InlineKeyboardButton("📊 Daily Stats", callback_dat
+        [InlineKeyboardButton("📢 FSub", callback_data="fsub_menu"), InlineKeyboardButton("📊 Daily Stats", callback_data="daily_stats_menu")],
+        [InlineKeyboardButton("❓ How to Download", callback_data="how_to_download_menu")]
+    ]
+    return text, InlineKeyboardMarkup(buttons)
+
+async def notify_and_remove_invalid_channel(client, user_id, channel_id, channel_type):
+    try:
+        await client.get_chat_member(channel_id, "me")
+        return True
+    except Exception:
+        db_key = 'index_db_channel' if channel_type == 'Index DB' else 'post_channels'
+        user_settings = await get_user(user_id)
+        if isinstance(user_settings.get(db_key), list):
+            await remove_from_list(user_id, db_key, channel_id)
+        else:
+            await update_user(user_id, db_key, None)
+        await client.send_message(user_id, f"⚠️ **Channel Inaccessible**\n\nYour {channel_type} Channel (ID: `{channel_id}`) has been automatically removed because I could not access it.")
+        return False
