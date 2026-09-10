@@ -270,7 +270,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     title_to_clean = initial_title
     if year_from_filename:
         title_to_clean = re.sub(r'\b' + str(year_from_filename) + r'\b', '', title_to_clean)
-
+    
     if raw_episode_text_to_remove:
         title_to_clean = title_to_clean.replace(raw_episode_text_to_remove, '')
         
@@ -313,6 +313,8 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     final_title = re.sub(r'^[^\w]+|[^\w]+$', '', final_title).strip()
 
     final_year = definitive_year if definitive_year else year_from_filename
+    if not final_year:
+        final_year = extract_year_from_filename(clean_name_ascii)
     
     is_series = bool(season_info_str) or bool(episode_info_str) or bool(day_info_str)
     
@@ -323,7 +325,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     display_title_with_year = display_title_main
     if final_year and f"({final_year})" not in display_title_main:
         display_title_with_year += f" ({final_year})"
-
+        
     return {
         "batch_title": f"{final_title} {season_info_str}".strip(),
         "display_title": display_title_with_year,
