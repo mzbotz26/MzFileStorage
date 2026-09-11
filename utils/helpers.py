@@ -134,6 +134,9 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     normalized_name = unicodedata.normalize('NFKD', clean_raw_name)
     clean_name_ascii = normalized_name.encode('ascii', 'ignore').decode('ascii')
     
+    # Release group signatures (e.g. ~ PSA, - Pahe, ~ GalaxyRG) cut karein
+    clean_name_ascii = re.sub(r'[\~-]\s*[A-Za-z0-9]+(?:\.[a-zA-Z0-9]+)?$', '', clean_name_ascii)
+
     # Telegram channels aur trailing handles remove karein
     clean_name_ascii = re.sub(r'--.*$', '', clean_name_ascii)
     name_for_parsing = clean_name_ascii.replace('_', ' ').replace('.', ' ')
@@ -166,9 +169,8 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         if standalone_s:
             season_info_str = f"S{int(standalone_s.group(1)):02d}"
 
+    # Universal range patterns (prioritizing explicit episode markers)
     range_patterns = [
-        (r'(\d{1,2})\s+(?:To|-|–|—)\s+(\d{1,2})', 'no_season'),
-        (r'(\d{1,2})\s+(\d{1,2})(?=\s\d{4})', 'no_season'),
         (r'S(\d{1,3}).*?EP\((\d{1,4})-(\d{1,4})\)', 'season'),
         (r'S(\d{1,3}).*?\[E?(\d{1,4})\s*-\s*E?(\d{1,4})\]', 'season'),
         (r'S(\d{1,3}).*?\[(\d{1,4})\s*To\s*(\d{1,4})\s*Eps?\]', 'season'),
@@ -177,8 +179,10 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         (r'S(\d{1,3}).*?Ep\.?(\d{1,4})-(\d{1,4})', 'season'),
         (r'S(\d{1,3})\s*E(\d{1,4})[-\s]*E(\d{1,4})', 'season'),
         (r'\.Ep\.\[(\d{1,4})-(\d{1,4})\]', 'no_season'),
-        (r'Ep\s*(\d{1,4})\s*-\s*(\d{1,4})', 'no_season'),
+        (r'\b(?:Ep|Episode|Epi|E)\s*(\d{1,4})\s*(?:-|to|–|—)\s*E?(\d{1,4})\b', 'no_season'),
         (r'(?:E|Episode)s?\.?\s?(\d{1,4})\s?(?:to|-|–|—)\s?(\d{1,4})', 'no_season'),
+        (r'(\d{1,2})\s+(?:To|-|–|—)\s+(\d{1,2})', 'no_season'),
+        (r'(\d{1,2})\s+(\d{1,2})(?=\s\d{4})', 'no_season'),
     ]
 
     for pattern, p_type in range_patterns:
@@ -197,7 +201,11 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
                 name_for_parsing = name_for_parsing.replace(raw_episode_text_to_remove, ' ', 1)
                 break 
 
-    name_for_ptn = re.sub(r'\[.*?\]', '', name_for_parsing).strip()
+    # Clean brackets and isolated range markers BEFORE PTN parsing to avoid title corruption
+    name_for_ptn = re.sub(r'\[.*?\]|\(.*?\)', ' ', name_for_parsing)
+    name_for_ptn = re.sub(r'\b(?:Ep|Episode|Epi|E)\s*\d{1,4}(?:\s*-\s*\d{1,4})?\b', ' ', name_for_ptn, flags=re.IGNORECASE)
+    name_for_ptn = re.sub(r'\s+', ' ', name_for_ptn).strip()
+    
     parsed_info = PTN.parse(name_for_ptn)
     
     initial_title = parsed_info.get('title', '').strip()
@@ -288,11 +296,14 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     title_to_clean = re.sub(r'(?:\D|^)(19\d{2}|20\d{2})(?:\D|$)', ' ', title_to_clean).strip()
     
     if raw_episode_text_to_remove:
-        title_to_clean = title_to_clean.replace(raw_episode_text_to_remove, '')
+        title_to_clean = title_to_clean.replace(raw_episode_text_to_remove, ' ')
         
-    title_to_clean = re.sub(r'\bS\d{1,3}\s*E\d{1,4}\b', '', title_to_clean, flags=re.IGNORECASE)
-    title_to_clean = re.sub(r'\bS\d{1,3}\b|\bE\d{1,4}\b|\bSeason\s*\d{1,3}\b', '', title_to_clean, flags=re.IGNORECASE)
+    title_to_clean = re.sub(r'\bS\d{1,3}\s*E\d{1,4}\b', ' ', title_to_clean, flags=re.IGNORECASE)
+    title_to_clean = re.sub(r'\bS\d{1,3}\b|\bE\d{1,4}\b|\bSeason\s*\d{1,3}\b', ' ', title_to_clean, flags=re.IGNORECASE)
     
+    # Stray remaining numbers (jaise range se bache hue '5 8' ya '05 08') ko remove karna
+    title_to_clean = re.sub(r'\b\d{1,3}(?:\s+\d{1,3})+\b', ' ', title_to_clean)
+
     day_match_inline = re.search(r'\b(?:Day|D)\s*\d{1,3}\b.*$', title_to_clean, flags=re.IGNORECASE)
     if day_match_inline:
         title_to_clean = title_to_clean[:day_match_inline.start()].strip()
@@ -353,7 +364,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         "part_info": part_info,
         "languages": sorted(list(found_languages)),
         "quality_tags": quality_tags_str
-    }
+                }
     
 async def create_post(client, user_id, messages, cache: dict):
     user = await get_user(user_id)
