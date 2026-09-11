@@ -1077,6 +1077,8 @@ async def add_channel_logic(client, query):
             channel_id = response.forward_from_chat.id
             
             try:
+                # Peer resolve karein taaki PeerIdInvalid error na aaye
+                await client.get_chat(channel_id)
                 member = await client.get_chat_member(channel_id, "me")
                 if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
                     raise ChatAdminRequired
@@ -1089,8 +1091,9 @@ async def add_channel_logic(client, query):
                 if prompt_msg: await prompt_msg.delete()
                 return
 
+            # Multi-channel fix: post_channels ko overwrite karne ke bajaye list me add karein
             if ch_type_short == 'post':
-                await set_post_channel(user_id, channel_id)
+                await add_to_list(user_id, "post_channels", channel_id)
             elif ch_type_short == 'db':
                 await set_index_db_channel(user_id, channel_id)
             elif ch_type_short == 'vlog':
