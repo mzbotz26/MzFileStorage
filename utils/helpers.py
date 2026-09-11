@@ -169,8 +169,10 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         if standalone_s:
             season_info_str = f"S{int(standalone_s.group(1)):02d}"
 
-    # Universal range patterns (prioritizing explicit episode markers)
+    # --- AGGRESSIVE UNIVERSAL EPISODE RANGE PARSER ---
     range_patterns = [
+        # Match 'Ep 01-04', 'Ep 05-08', 'E01-E04', '01-04' with or without spaces
+        (r'\b(?:Ep|Episode|Epi|E)?\s*0*(\d{1,3})\s*[-–—toTo]\s*(?:Ep|Episode|Epi|E)?\s*0*(\d{1,3})\b', 'no_season'),
         (r'S(\d{1,3}).*?EP\((\d{1,4})-(\d{1,4})\)', 'season'),
         (r'S(\d{1,3}).*?\[E?(\d{1,4})\s*-\s*E?(\d{1,4})\]', 'season'),
         (r'S(\d{1,3}).*?\[(\d{1,4})\s*To\s*(\d{1,4})\s*Eps?\]', 'season'),
@@ -179,10 +181,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         (r'S(\d{1,3}).*?Ep\.?(\d{1,4})-(\d{1,4})', 'season'),
         (r'S(\d{1,3})\s*E(\d{1,4})[-\s]*E(\d{1,4})', 'season'),
         (r'\.Ep\.\[(\d{1,4})-(\d{1,4})\]', 'no_season'),
-        (r'\b(?:Ep|Episode|Epi|E)\s*(\d{1,4})\s*(?:-|to|–|—)\s*E?(\d{1,4})\b', 'no_season'),
         (r'(?:E|Episode)s?\.?\s?(\d{1,4})\s?(?:to|-|–|—)\s?(\d{1,4})', 'no_season'),
-        (r'(\d{1,2})\s+(?:To|-|–|—)\s+(\d{1,2})', 'no_season'),
-        (r'(\d{1,2})\s+(\d{1,2})(?=\s\d{4})', 'no_season'),
     ]
 
     for pattern, p_type in range_patterns:
@@ -196,14 +195,16 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
             else:
                 start_ep, end_ep = groups[0], groups[1]
 
-            if int(start_ep) < int(end_ep):
-                episode_info_str = f"E{int(start_ep):02d}-E{int(end_ep):02d}"
+            # Avoid false positives with resolutions (e.g. 720, 1080)
+            if int(start_ep) < int(end_ep) and int(end_ep) < 1000:
+                episode_info_str = f"EP {int(start_ep):02d}-{int(end_ep):02d}"
                 name_for_parsing = name_for_parsing.replace(raw_episode_text_to_remove, ' ', 1)
                 break 
 
-    # Clean brackets and isolated range markers BEFORE PTN parsing to avoid title corruption
+    # Clean brackets and isolated range markers BEFORE PTN parsing to prevent title leaks
     name_for_ptn = re.sub(r'\[.*?\]|\(.*?\)', ' ', name_for_parsing)
-    name_for_ptn = re.sub(r'\b(?:Ep|Episode|Epi|E)\s*\d{1,4}(?:\s*-\s*\d{1,4})?\b', ' ', name_for_ptn, flags=re.IGNORECASE)
+    name_for_ptn = re.sub(r'\b(?:Ep|Episode|Epi|E)?\s*\d{1,4}\s*[-–—toTo]\s*\d{1,4}\b', ' ', name_for_ptn, flags=re.IGNORECASE)
+    name_for_ptn = re.sub(r'\b(?:Ep|Episode|Epi|E)\s*\d{1,4}\b', ' ', name_for_ptn, flags=re.IGNORECASE)
     name_for_ptn = re.sub(r'\s+', ' ', name_for_ptn).strip()
     
     parsed_info = PTN.parse(name_for_ptn)
@@ -219,22 +220,22 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         except Exception:
             season_info_str = f"S{s_val}"
 
-    # Episode extraction fallback
+    # Episode extraction fallback (sirf agar range na mili ho tab)
     if not episode_info_str:
         ep_val = parsed_info.get('episode')
         if ep_val:
             if isinstance(ep_val, list):
-                if len(ep_val) > 1: episode_info_str = f"E{int(min(ep_val)):02d}-E{int(max(ep_val)):02d}"
-                elif ep_val: episode_info_str = f"E{int(ep_val[0]):02d}"
+                if len(ep_val) > 1: episode_info_str = f"EP {int(min(ep_val)):02d}-{int(max(ep_val)):02d}"
+                elif ep_val: episode_info_str = f"EP {int(ep_val[0]):02d}"
             else:
                 try:
-                    episode_info_str = f"E{int(ep_val):02d}"
+                    episode_info_str = f"EP {int(ep_val):02d}"
                 except Exception:
-                    episode_info_str = f"E{ep_val}"
+                    episode_info_str = f"EP {ep_val}"
         else:
             ep_direct = re.search(r'\b(?:E|EP|Episode)\s*0*(\d{1,4})\b', name_for_parsing, re.IGNORECASE)
             if ep_direct:
-                episode_info_str = f"E{int(ep_direct.group(1)):02d}"
+                episode_info_str = f"EP {int(ep_direct.group(1)):02d}"
     
     year_from_filename = parsed_info.get('year')
     if not year_from_filename:
@@ -301,8 +302,8 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     title_to_clean = re.sub(r'\bS\d{1,3}\s*E\d{1,4}\b', ' ', title_to_clean, flags=re.IGNORECASE)
     title_to_clean = re.sub(r'\bS\d{1,3}\b|\bE\d{1,4}\b|\bSeason\s*\d{1,3}\b', ' ', title_to_clean, flags=re.IGNORECASE)
     
-    # Stray remaining numbers (jaise range se bache hue '5 8' ya '05 08') ko remove karna
-    title_to_clean = re.sub(r'\b\d{1,3}(?:\s+\d{1,3})+\b', ' ', title_to_clean)
+    # Title ke andar se bache hue isolated episode numbers (jaise '04', '08', '5 8') saaf karein
+    title_to_clean = re.sub(r'\b0*\d{1,2}\b', ' ', title_to_clean)
 
     day_match_inline = re.search(r'\b(?:Day|D)\s*\d{1,3}\b.*$', title_to_clean, flags=re.IGNORECASE)
     if day_match_inline:
@@ -364,7 +365,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         "part_info": part_info,
         "languages": sorted(list(found_languages)),
         "quality_tags": quality_tags_str
-                }
+    }
     
 async def create_post(client, user_id, messages, cache: dict):
     user = await get_user(user_id)
