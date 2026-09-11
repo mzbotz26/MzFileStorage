@@ -1,4 +1,4 @@
-# MzBotz/Mz-File-Store/features/poster.py
+# mzbotz/mz-file-store/features/poster.py
 
 import asyncio
 import aiohttp
