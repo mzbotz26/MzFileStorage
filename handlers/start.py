@@ -344,7 +344,7 @@ async def handle_public_file_request(client, message, requester_id, payload):
     # ===============================
     # FSUB CHECK
     # ===============================
-        fsub_channel = owner_settings.get("fsub_channel") if owner_settings else None
+    fsub_channel = owner_settings.get("fsub_channel") if owner_settings else None
 
     if fsub_channel:
         try:
@@ -356,8 +356,7 @@ async def handle_public_file_request(client, message, requester_id, payload):
             except Exception:
                 invite = owner_settings.get("fsub_invite_link") or "https://t.me"
 
-            return await safe_reply(
-                message,
+            return await message.reply_text(
                 "📢 **Join channel first:**",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("Join Channel", url=invite)],
@@ -391,10 +390,8 @@ async def handle_public_file_request(client, message, requester_id, payload):
         bot_username = client.me.username if hasattr(client, "me") and client.me else "Mzfilestorage_bot"
 
         if not has_active_shortener:
-            # Shortener off ya set na hone par direct bot verify link
             verify_url = f"https://t.me/{bot_username}?start=verify_{owner_id}_{file_unique_id}"
         else:
-            # Shortener active hone par HMAC-SHA256 secured link
             short_id = ''.join(random.choices(string.ascii_letters + string.digits, k=7))
             ts = int(time.time())
             secret_key = getattr(Config, "SECRET_KEY", "mz_super_secret_anti_bypass_key_2026")
@@ -433,7 +430,6 @@ async def handle_public_file_request(client, message, requester_id, payload):
     # ===============================
     await record_daily_view(owner_id, requester_id)
     
-    # Agar user abhi verification gap ke andar hai, toh time alert dikhayein
     from database.db import verified_users
     v_data = await verified_users.find_one({"owner_id": owner_id, "requester_id": requester_id})
     if v_data and "expires_at" in v_data:
