@@ -344,45 +344,33 @@ async def handle_public_file_request(client, message, requester_id, payload):
     # ===============================
     # FSUB CHECK
     # ===============================
-    fsub_channel = owner_settings.get('fsub_channel') if owner_settings else None
+        fsub_channel = owner_settings.get("fsub_channel") if owner_settings else None
 
     if fsub_channel:
         try:
-            await client.get_chat_member(chat_id=fsub_channel, user_id="me")
+            fsub_channel = int(str(fsub_channel).strip())
+            await client.get_chat_member(fsub_channel, requester_id)
+        except UserNotParticipant:
             try:
-                await client.get_chat_member(chat_id=fsub_channel, user_id=requester_id)
-            except UserNotParticipant:
-                try:
-                    invite_link = await client.export_chat_invite_link(fsub_channel)
-                except Exception:
-                    invite_link = None
-
-                buttons = []
-                if invite_link:
-                    buttons.append([InlineKeyboardButton("📢 Join Channel", url=invite_link)])
-
-                buttons.append([InlineKeyboardButton("🔄 Retry", callback_data=f"retry_{payload}")])
-
-                return await message.reply_text(
-                    "You must join the channel to continue.",
-                    reply_markup=InlineKeyboardMarkup(buttons)
-                )
-
-        except (ChatAdminRequired, ChannelInvalid, PeerIdInvalid, ChannelPrivate, UserNotParticipant) as e:
-            logger.error(f"FSub channel error for owner {owner_id} (Channel: {fsub_channel}): {e}")
-            try:
-                await client.send_message(
-                    chat_id=owner_id,
-                    text=(
-                        "⚠️ **FSub Channel Error**\n\n"
-                        f"Your FSub channel (`{fsub_channel}`) is no longer valid.\n\n"
-                        "It has been automatically disabled."
-                    ),
-                    parse_mode=enums.ParseMode.MARKDOWN
-                )
-                await update_user(owner_id, "fsub_channel", None)
+                invite = await client.export_chat_invite_link(fsub_channel)
             except Exception:
-                pass
+                invite = owner_settings.get("fsub_invite_link") or "https://t.me"
+
+            return await safe_reply(
+                message,
+                "📢 **Join channel first:**",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("Join Channel", url=invite)],
+                    [InlineKeyboardButton(
+                        "🔄 Retry",
+                        callback_data=f"retry_{payload}"
+                    )]
+                ])
+            )
+        except Exception as e:
+            # Restart ke baad agar Peer Invalid aaye to freeze hone ke bajaye
+            # bypass hokar user ko file mil jaye
+            pass
 
     # ===============================
     # VERIFY CHECK (SHORTENER ON / OFF + ANTI-BYPASS)
