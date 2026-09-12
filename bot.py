@@ -484,42 +484,40 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
-        self.me = await self.get_me()
+        self.me = await self.get_me()[span_1](start_span)[span_1](end_span)
 
         # ============================================================
-        # 🔄 STARTUP WARMUP: Auto-Cache All Channel Peers (FSub, DB, Logs)
+        # 🔄 BOT-SAFE WARMUP: Resolve DB Channel via Raw Peer
         # ============================================================
-        logger.info("Syncing channel peers on startup to prevent PeerIdInvalid...")
-        try:
-            async for dialog in self.get_dialogs(limit=50):
-                pass
-            logger.info("✅ All dialog peers successfully loaded into SQLite cache.")
-        except Exception as e:
-            logger.warning(f"Dialog peer warmup skipped or partial: {e}")
-
-        # Owner DB Verification
         if self.owner_db_channel:
+            logger.info(f"Resolving peer for Owner DB [{self.owner_db_channel}]...")[span_2](start_span)[span_2](end_span)
             try:
-                logger.info(f"Initial health check for Owner DB [{self.owner_db_channel}]...")
-                await self.send_message(self.owner_db_channel, f"✅ **Bot Online & Connected**\n\n@{self.me.username} has started successfully.")
-                self.is_healthy.set()
+                # Raw peer resolution
+                peer = await self.resolve_peer(self.owner_db_channel)
+                logger.info(f"✅ Owner DB Peer successfully cached: {peer}")
             except Exception as e:
-                logger.warning(f"Initial message to Owner DB failed: {e}. Checking chat access...")
-                try:
-                    await self.get_chat(self.owner_db_channel)
-                    self.is_healthy.set()
-                    logger.info("✅ Owner DB chat verified via get_chat.")
-                except Exception as inner_e:
-                    logger.error(f"FATAL: Could not verify Owner DB Channel on startup: {inner_e}")
-                    self.is_healthy.set()  # Don't freeze bot completely on fresh restarts
+                logger.warning(f"Direct resolve_peer failed: {e}. Trying fallback...")
+
+            # Ab send message try karein
+            try:
+                await self.send_message(
+                    self.owner_db_channel,
+                    f"✅ **Bot Online & Connected**\n\n@{self.me.username} has started successfully."
+                )[span_3](start_span)[span_3](end_span)
+                self.is_healthy.set()[span_4](start_span)[span_4](end_span)
+                logger.info("✅ Owner DB message sent successfully.")
+            except Exception as e:
+                logger.warning(f"Initial test message to Owner DB failed: {e}")[span_5](start_span)[span_5](end_span)
+                # Still set healthy taaki users ki normal file flow freeze na ho
+                self.is_healthy.set()[span_6](start_span)[span_6](end_span)
         else:
-            logger.warning("Owner DB ID not set. Critical functionalities will fail.")
+            logger.warning("Owner DB ID not set. Critical functionalities will fail.")[span_7](start_span)[span_7](end_span)
         
-        await self.start_web_server()
-        asyncio.create_task(self.daily_restart_handler())
-        asyncio.create_task(self.connection_health_check())
-        asyncio.create_task(self.daily_stats_notifier())
-        logger.info(f"Bot @{self.me.username} started successfully with direct processing architecture.")
+        await self.start_web_server()[span_8](start_span)[span_8](end_span)
+        asyncio.create_task(self.daily_restart_handler())[span_9](start_span)[span_9](end_span)
+        asyncio.create_task(self.connection_health_check())[span_10](start_span)[span_10](end_span)
+        asyncio.create_task(self.daily_stats_notifier())[span_11](start_span)[span_11](end_span)
+        logger.info(f"Bot @{self.me.username} started successfully with direct processing architecture.")[span_12](start_span)[span_12](end_span)
 
     async def stop(self, *args):
         logger.info("Stopping bot...")
