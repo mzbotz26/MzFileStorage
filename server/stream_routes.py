@@ -404,7 +404,7 @@ async def api_v5_confirm_handler(request):
             if not vlog_ch or not bot:
                 return
             try:
-                # User info nikalna username ke liye
+                # 1. User display format
                 user_display = f"`{requester_id}`"
                 try:
                     user_chat = await bot.get_users(requester_id)
@@ -426,9 +426,20 @@ async def api_v5_confirm_handler(request):
                     f"📅 **Time:** `{ist_time.strftime('%Y-%m-%d %I:%M:%S %p')} IST`"
                 )
 
-                await bot.send_message(chat_id=int(vlog_ch), text=log_msg)
+                # 2. Target channel resolve & send
+                target_chat_id = int(str(vlog_ch).strip())
+                try:
+                    await bot.send_message(chat_id=target_chat_id, text=log_msg)
+                except Exception:
+                    # Agar restart ke baad direct numeric ID fail ho, to chat resolve karke try karein
+                    try:
+                        resolved = await bot.get_chat(target_chat_id)
+                        await bot.send_message(chat_id=resolved.id, text=log_msg)
+                    except Exception as inner_err:
+                        logger.warning(f"Verify log skipped due to peer cache: {inner_err}")
+
             except Exception as err:
-                logger.error(f"Error dispatching verify log: {err}")
+                logger.warning(f"Error preparing verify log: {err}")
 
         # Send log for current completed step
         await send_channel_log(current_step)
