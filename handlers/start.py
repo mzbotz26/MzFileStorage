@@ -351,20 +351,42 @@ async def handle_public_file_request(client, message, requester_id, payload):
             fsub_channel = int(str(fsub_channel).strip())
             await client.get_chat_member(fsub_channel, requester_id)
         except UserNotParticipant:
+            # 1. Invite Link Resolve
             try:
                 invite = await client.export_chat_invite_link(fsub_channel)
             except Exception:
                 invite = owner_settings.get("fsub_invite_link") or "https://t.me"
 
+            # 2. Dynamic Channel Title Fetch (With Safe Fallback)
+            ch_title = "Our Official Channel"
+            try:
+                chat_info = await client.get_chat(fsub_channel)
+                if chat_info and chat_info.title:
+                    ch_title = chat_info.title
+            except Exception:
+                pass
+
+            # 3. Mention Name Setup
+            user_mention = getattr(message.from_user, "mention", "User")
+
+            # 4. Premium Aesthetic Layout
+            fsub_text = (
+                f"👋 **Hey {user_mention},**\n\n"
+                "🔒 **Access Restricted!**\n"
+                "Aapki file locked hai. File unlock karne ke liye aapko hamara official channel join karna zaroori hai.\n\n"
+                f"📌 **Channel:** `{ch_title}`\n\n"
+                "👇 **Quick Steps:**\n"
+                "1️⃣ Niche **'📢 Join Channel'** par click karke channel join karein.\n"
+                "2️⃣ Wapas aakar **'🔄 Try Again'** button press karein."
+            )
+
             return await message.reply_text(
-                "📢 **Join channel first:**",
+                text=fsub_text,
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("Join Channel", url=invite)],
-                    [InlineKeyboardButton(
-                        "🔄 Retry",
-                        callback_data=f"retry_{payload}"
-                    )]
-                ])
+                    [InlineKeyboardButton("📢 Join Channel", url=invite)],
+                    [InlineKeyboardButton("🔄 Try Again", callback_data=f"retry_{payload}")]
+                ]),
+                disable_web_page_preview=True
             )
         except Exception as e:
             # Restart ke baad agar Peer Invalid aaye to freeze hone ke bajaye
