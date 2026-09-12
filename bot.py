@@ -381,4 +381,151 @@ class Bot(Client):
             today = now.date()
             notify_time = datetime.combine(today, dt_time(hour=23, minute=59), tzinfo=UTC)
             if now > notify_time: notify_time += timedelta(days=1)
-  
+            
+            sleep_duration = (notify_time - now).total_seconds()
+            logger.info(f"Scheduled daily stats notification in {sleep_duration / 3600:.2f} hours (UTC).")
+            await asyncio.sleep(sleep_duration)
+            
+            logger.info("STATS: Starting daily notification process...")
+            user_ids_to_notify = await get_users_with_daily_notify_enabled()
+            
+            for user_id in user_ids_to_notify:
+                try:
+                    stats_data = await get_stats_for_owner(user_id, days=6)
+                    stats_dict = {s['date'].strftime('%Y-%m-%d'): s['view_count'] for s in stats_data}
+                    
+                    today_utc = datetime.now(UTC).date()
+                    today_str = today_utc.strftime('%Y-%m-%d')
+                    
+                    today_clicks = stats_dict.get(today_str, 0)
+                    
+                    yesterday_utc = today_utc - timedelta(days=1)
+                    yesterday_str = yesterday_utc.strftime('%Y-%m-%d')
+                    yesterday_clicks = stats_dict.get(yesterday_str, 0)
+                    
+                    if yesterday_clicks > 0:
+                        change = ((today_clicks - yesterday_clicks) / yesterday_clicks) * 100
+                        change_str = f"📈 {change:.1f}%" if change >= 0 else f"📉 {abs(change):.1f}%"
+                    elif today_clicks > 0:
+                        change_str = "📈 New Activity"
+                    else:
+                        change_str = "📊 No Change"
+
+                    text = f"**📊 Daily Clicks Dashboard - {today_utc.strftime('%d %B %Y')}**\n\n"
+                    text += f"**Today's Clicks:** `{today_clicks}`\n"
+                    text += f"**vs. Yesterday:** `{change_str}`\n\n"
+                    text += "**Last 5 Days Performance:**\n"
+                    
+                    for i in range(1, 6):
+                        day = today_utc - timedelta(days=i)
+                        day_str = day.strftime('%Y-%m-%d')
+                        clicks = stats_dict.get(day_str, 0)
+                        text += f" ` - ` {day.strftime('%a, %b %d')}: `{clicks}` clicks\n"
+                        
+                    monthly_record = await get_monthly_record(user_id)
+                    current_high = monthly_record.get('highest_view_count', 0) if monthly_record else 0
+                    
+                    if today_clicks > current_high:
+                        await update_monthly_record(user_id, today_clicks, datetime.now(UTC))
+                        congrats_msg = (
+                            f"🎉 **Congratulations! New Record!** 🎉\n\n"
+                            f"You've set a new 30-day clicks record with **{today_clicks}** clicks today, "
+                            f"beating your previous record of {current_high}!\n\n"
+                            "Keep up the great work!"
+                        )
+                        await self.send_message(user_id, congrats_msg)
+                        
+                    await self.send_message(user_id, text)
+                    await asyncio.sleep(1)
+                except UserIsBlocked:
+                    logger.warning(f"STATS: Could not send dashboard to {user_id}, user has blocked the bot.")
+                except Exception as e:
+                    logger.error(f"STATS: Failed to send dashboard to user {user_id}: {e}")
+
+            logger.info("STATS: Daily notification process finished.")
+
+    async def connection_health_check(self):
+        logger.info("✅ Bot health monitor started.")
+        while True:
+            await asyncio.sleep(120)
+            if not self.owner_db_channel: continue
+
+            is_currently_ok = False
+            error_details = ""
+            try:
+                await self.get_chat(self.owner_db_channel)
+                is_currently_ok = True
+                self.last_health_check_error = ""
+            except Exception as e:
+                error_details = f"Health Check FAILED. Error: {e}"
+                logger.error(error_details)
+                is_currently_ok = False
+                self.last_health_check_error = str(e)
+
+            if is_currently_ok:
+                if not self.is_healthy.is_set():
+                    logger.info("✅ HEALTH CHECK PASSED: Connection and permissions in Owner DB Channel are restored.")
+                    self.is_healthy.set()
+                self.last_health_check_status = True
+            else:
+                if self.is_healthy.is_set():
+                    logger.critical("🚨 BOT UNHEALTHY: Pausing file processing due to DB channel failure.")
+                    self.is_healthy.clear()
+                    try:
+                        await self.send_message(Config.ADMIN_ID,
+                            f"**🚨 BOT CRITICAL ERROR**\n\n"
+                            f"I can no longer operate in the Owner DB Channel (`{self.owner_db_channel}`). File processing is **paused**.\n\n"
+                            f"**Reason:** `{error_details}`\n\n"
+                            "I will try to recover automatically. Please check my admin rights in the channel and the server's network."
+                        )
+                    except Exception as e:
+                        logger.error(f"Could not send critical alert to admin: {e}")
+                self.last_health_check_status = False
+
+    async def start(self):
+        await super().start()
+        self.me = await self.get_me()
+
+        # ============================================================
+        # 🔄 STARTUP WARMUP: Auto-Cache All Channel Peers (FSub, DB, Logs)
+        # ============================================================
+        logger.info("Syncing channel peers on startup to prevent PeerIdInvalid...")
+        try:
+            async for dialog in self.get_dialogs(limit=50):
+                pass
+            logger.info("✅ All dialog peers successfully loaded into SQLite cache.")
+        except Exception as e:
+            logger.warning(f"Dialog peer warmup skipped or partial: {e}")
+
+        # Owner DB Verification
+        if self.owner_db_channel:
+            try:
+                logger.info(f"Initial health check for Owner DB [{self.owner_db_channel}]...")
+                await self.send_message(self.owner_db_channel, f"✅ **Bot Online & Connected**\n\n@{self.me.username} has started successfully.")
+                self.is_healthy.set()
+            except Exception as e:
+                logger.warning(f"Initial message to Owner DB failed: {e}. Checking chat access...")
+                try:
+                    await self.get_chat(self.owner_db_channel)
+                    self.is_healthy.set()
+                    logger.info("✅ Owner DB chat verified via get_chat.")
+                except Exception as inner_e:
+                    logger.error(f"FATAL: Could not verify Owner DB Channel on startup: {inner_e}")
+                    self.is_healthy.set()  # Don't freeze bot completely on fresh restarts
+        else:
+            logger.warning("Owner DB ID not set. Critical functionalities will fail.")
+        
+        await self.start_web_server()
+        asyncio.create_task(self.daily_restart_handler())
+        asyncio.create_task(self.connection_health_check())
+        asyncio.create_task(self.daily_stats_notifier())
+        logger.info(f"Bot @{self.me.username} started successfully with direct processing architecture.")
+
+    async def stop(self, *args):
+        logger.info("Stopping bot...")
+        if self.web_runner: await self.web_runner.cleanup()
+        await super().stop()
+        logger.info("Bot stopped.")
+
+if __name__ == "__main__":
+    Bot().run()
