@@ -33,7 +33,8 @@ from database.db import (
     record_daily_view,
     get_user_verify_step,
     set_user_verify_step,
-    get_verify_log_channel
+    get_verify_log_channel,
+    has_requested_join
 )
 from utils.helpers import get_main_menu
 from features.shortener import get_shortlink
