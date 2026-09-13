@@ -427,10 +427,6 @@ async def handle_public_file_request(client, message, requester_id, payload):
             reply_markup=InlineKeyboardMarkup(missing_buttons),
             disable_web_page_preview=True
         )
-        except Exception as e:
-            # Restart ke baad agar Peer Invalid aaye to freeze hone ke bajaye
-            # bypass hokar user ko file mil jaye
-            pass
 
     # ===============================
     # VERIFY CHECK (SHORTENER ON / OFF + ANTI-BYPASS)
