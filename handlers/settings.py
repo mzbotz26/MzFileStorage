@@ -302,23 +302,45 @@ async def get_fsub_menu_parts(client, user_id):
     if not user: await add_user(user_id); user = await get_user(user_id)
     
     fsub_ch = user.get('fsub_channel')
-    text = "**📢 FSub Settings**\n\n"
+    req_fsub_ch = user.get('req_fsub_channel')
+
+    # Safe title fetch without crashing on restart
+    normal_title = "Not Set"
     if fsub_ch:
-        is_valid = await notify_and_remove_invalid_channel(client, user_id, fsub_ch, "FSub")
-        if is_valid:
-            try:
-                chat = await client.get_chat(fsub_ch)
-                text += f"Current FSub Channel: **{chat.title}** (`{fsub_ch}`)"
-            except:
-                text += f"Current FSub Channel ID: `{fsub_ch}`"
-    else:
-        text += "No FSub channel is set."
+        try:
+            chat = await client.get_chat(fsub_ch)
+            normal_title = chat.title
+        except Exception:
+            normal_title = f"`{fsub_ch}`"
+
+    req_title = "Not Set"
+    if req_fsub_ch:
+        try:
+            chat = await client.get_chat(req_fsub_ch)
+            req_title = chat.title
+        except Exception:
+            req_title = f"`{req_fsub_ch}`"
+
+    text = (
+        "**📢 Dual Force-Subscribe (FSub) Settings**\n\n"
+        f"1️⃣ **Normal FSub (Join Required):**\n"
+        f"• Status: `{normal_title}`\n\n"
+        f"2️⃣ **Request FSub (Join Request):**\n"
+        f"• Status: `{req_title}`\n\n"
+        "Configure your channels below:"
+    )
+
     buttons = [
-        [InlineKeyboardButton("✏️ Set/Change FSub", callback_data="set_fsub")],
+        [
+            InlineKeyboardButton("✏️ Set Normal", callback_data="set_fsub_normal"),
+            InlineKeyboardButton("🗑️ Remove", callback_data="remove_fsub_normal")
+        ],
+        [
+            InlineKeyboardButton("✏️ Set Request-Join", callback_data="set_fsub_req"),
+            InlineKeyboardButton("🗑️ Remove", callback_data="remove_fsub_req")
+        ],
+        [go_back_button(user_id).inline_keyboard[0][0]]
     ]
-    if fsub_ch:
-        buttons.append([InlineKeyboardButton("🗑️ Remove FSub", callback_data="remove_fsub")])
-    buttons.append([go_back_button(user_id).inline_keyboard[0][0]])
     return text, InlineKeyboardMarkup(buttons)
 
 
@@ -1135,79 +1157,119 @@ async def set_filename_link_handler(client, query):
     except:
         logger.exception("Error in set_filename_link_handler"); await safe_edit_message(query, text="An error occurred.", reply_markup=go_back_button(user_id))
 
-@Client.on_callback_query(filters.regex(r"^(set_fsub|set_download(_\d)?|remove_fsub)$"))
+@Client.on_callback_query(filters.regex(r"^(set_fsub(_normal|_req)?|remove_fsub(_normal|_req)?|set_download(_\d)?)$"))
 async def fsub_and_download_handler(client, query):
     await query.answer()
     asyncio.create_task(fsub_and_download_logic(client, query))
 
 async def fsub_and_download_logic(client, query):
     user_id = query.from_user.id
-    data_parts = query.data.split("_")
-    action = data_parts[1] # 'fsub' ya 'download'
-    step = int(data_parts[2]) if len(data_parts) == 3 else 1
+    data = query.data
 
-    if action == "fsub" and query.data == "remove_fsub":
-        await update_user(user_id, "fsub_channel", None)
-        await client.send_message(user_id, "FSub channel has been removed.")
+    # --- REMOVE FSUB CHANNELS ---
+    if data.startswith("remove_fsub"):
+        sub_type = data.replace("remove_fsub_", "").replace("remove_fsub", "")
+        if sub_type == "req":
+            await update_user(user_id, "req_fsub_channel", None)
+            await query.answer("Request-to-join FSub channel removed!", show_alert=True)
+        else:
+            await update_user(user_id, "fsub_channel", None)
+            await query.answer("Normal FSub channel removed!", show_alert=True)
+            
         text, markup = await get_fsub_menu_parts(client, user_id)
         await safe_edit_message(query, text, reply_markup=markup)
         return
 
-    key = "fsub_channel" if action == "fsub" else f"how_to_download_link_{step}"
+    # --- SET FSUB CHANNELS ---
+    if data.startswith("set_fsub"):
+        sub_type = "req" if "req" in data else "normal"
+        db_key = "req_fsub_channel" if sub_type == "req" else "fsub_channel"
+        type_name = "Request-to-Join FSub" if sub_type == "req" else "Normal FSub"
+
+        prompt = await query.message.edit_text(
+            f"📢 **Set {type_name} Channel**\n\n"
+            "Forward a message from your channel or send the numeric ID (`-100...`).\n\n"
+            "__Make sure the bot is an Admin in the channel.__",
+            reply_markup=go_back_button(user_id)
+        )
+
+        try:
+            response = await client.listen(chat_id=user_id, timeout=300)
+            
+            # Support both Forwarded message and Direct Chat ID
+            channel_id = None
+            if response.forward_from_chat:
+                channel_id = response.forward_from_chat.id
+            elif response.text and (response.text.strip().startswith("-100") or response.text.strip().isdigit()):
+                try:
+                    channel_id = int(response.text.strip())
+                except ValueError:
+                    channel_id = None
+
+            if not channel_id:
+                await safe_edit_message(prompt, "❌ Invalid input. Please forward a channel message or send a valid channel ID.", reply_markup=go_back_button(user_id))
+                return
+
+            await safe_edit_message(prompt, "⏳ Checking bot permissions in channel...")
+            try:
+                chat = await client.get_chat(channel_id)
+                member = await client.get_chat_member(channel_id, "me")
+                if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
+                    raise ChatAdminRequired
+            except Exception as e:
+                await safe_edit_message(prompt, f"❌ **Permission Denied!** Bot must be an Admin in `{channel_id}`.\n\nError: `{e}`", reply_markup=go_back_button(user_id))
+                return
+
+            await update_user(user_id, db_key, channel_id)
+            await safe_edit_message(prompt, f"✅ **Success!** {type_name} channel set to **{chat.title}**.")
+            await asyncio.sleep(2)
+            text, markup = await get_fsub_menu_parts(client, user_id)
+            await safe_edit_message(prompt, text, reply_markup=markup)
+
+        except ListenerTimeout:
+            if prompt: await safe_edit_message(prompt, text="❗️ **Timeout:** Setup cancelled.", reply_markup=go_back_button(user_id))
+        except Exception as e:
+            logger.exception("Error in set_fsub")
+            if prompt: await safe_edit_message(prompt, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
+        finally:
+            if 'response' in locals() and response:
+                try: await response.delete()
+                except: pass
+        return
+
+    # --- TUTORIAL / HOW TO DOWNLOAD (Original Unchanged) ---
+    data_parts = data.split("_")
+    step = int(data_parts[2]) if len(data_parts) == 3 else 1
+    key = f"how_to_download_link_{step}"
     
     prompt = None
     response = None
     try:
-        if action == "fsub":
-            initial_text = "📢 **Set FSub**\n\nForward a message from your FSub channel. I must be an admin there to work correctly."
-            listen_filters = filters.forwarded
-        else:
-            user = await get_user(user_id)
-            current_link = user.get(key) if user else None
-            initial_text = f"❓ **Set Step {step} 'How to Download' Link**\n\nSend your tutorial URL."
-            if current_link:
-                initial_text += f"\n\n**Current Link:** `{current_link}`"
-            listen_filters = filters.text
+        user = await get_user(user_id)
+        current_link = user.get(key) if user else None
+        initial_text = f"❓ **Set Step {step} 'How to Download' Link**\n\nSend your tutorial URL."
+        if current_link:
+            initial_text += f"\n\n**Current Link:** `{current_link}`"
 
         prompt = await query.message.edit_text(initial_text, reply_markup=go_back_button(user_id), disable_web_page_preview=True)
-        response = await client.listen(chat_id=user_id, timeout=300, filters=listen_filters)
-        
-        if action == "fsub":
-            if not response.forward_from_chat:
-                await safe_edit_message(prompt, "This is not a valid forwarded message from a channel.", reply_markup=go_back_button(user_id))
-                return
-            channel_id = response.forward_from_chat.id
-            await safe_edit_message(prompt, "⏳ Checking permissions in the channel...")
-            try:
-                member = await client.get_chat_member(channel_id, "me")
-                if member.status not in [enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
-                    raise UserNotParticipant
-            except (UserNotParticipant, ChannelPrivate, ChatAdminRequired) as e:
-                await safe_edit_message(prompt, "❌ **Permission Denied!** Make me admin first.", reply_markup=go_back_button(user_id))
-                return
+        response = await client.listen(chat_id=user_id, timeout=300, filters=filters.text)
 
-            await update_user(user_id, key, channel_id)
-            await safe_edit_message(prompt, f"✅ **Success!** FSub channel updated.")
-            await asyncio.sleep(2)
-            text, markup = await get_fsub_menu_parts(client, user_id)
-            await safe_edit_message(prompt, text, reply_markup=markup)
-        else:
-            url_to_check = response.text.strip()
-            if not url_to_check.startswith(("http://", "https://")): 
-                url_to_check = "https://" + url_to_check
-                
-            await update_user(user_id, key, url_to_check)
-            if step == 1:
-                await update_user(user_id, "how_to_download_link", url_to_check)
-                
-            await safe_edit_message(prompt, f"✅ **Success!** Step {step} tutorial link saved.")
-            await asyncio.sleep(2)
-            await how_to_download_menu_handler(client, query)
+        url_to_check = response.text.strip()
+        if not url_to_check.startswith(("http://", "https://")): 
+            url_to_check = "https://" + url_to_check
+            
+        await update_user(user_id, key, url_to_check)
+        if step == 1:
+            await update_user(user_id, "how_to_download_link", url_to_check)
+            
+        await safe_edit_message(prompt, f"✅ **Success!** Step {step} tutorial link saved.")
+        await asyncio.sleep(2)
+        await how_to_download_menu_handler(client, query)
 
     except ListenerTimeout:
         if prompt: await safe_edit_message(prompt, text="❗️ **Timeout:** Cancelled.", reply_markup=go_back_button(user_id))
     except Exception as e:
-        logger.exception("Error in handler")
+        logger.exception("Error in download tutorial handler")
         if prompt: await safe_edit_message(prompt, text=f"An error occurred: {e}", reply_markup=go_back_button(user_id))
     finally:
         if response:
