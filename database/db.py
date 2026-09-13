@@ -440,3 +440,15 @@ async def get_verify_log_channel(user_id: int):
     user = await users.find_one({'user_id': user_id})
     return user.get('verify_log_channel') if user else None
   
+join_requests = db['join_requests']
+
+async def add_join_request(user_id: int, channel_id: int):
+    await join_requests.update_one(
+        {"user_id": user_id, "channel_id": channel_id},
+        {"$set": {"user_id": user_id, "channel_id": channel_id}},
+        upsert=True
+    )
+
+async def has_requested_join(user_id: int, channel_id: int) -> bool:
+    doc = await join_requests.find_one({"user_id": user_id, "channel_id": channel_id})
+    return bool(doc)
