@@ -342,53 +342,91 @@ async def handle_public_file_request(client, message, requester_id, payload):
 
     owner_settings = await get_user(owner_id)
 
-    # ===============================
-    # FSUB CHECK
-    # ===============================
-    fsub_channel = owner_settings.get("fsub_channel") if owner_settings else None
+        # ============================================================
+    # 📢 DUAL FSUB CHECK (NORMAL JOIN + REQUEST-TO-JOIN)
+    # ============================================================
+    normal_fsub = owner_settings.get("fsub_channel") if owner_settings else None
+    req_fsub = owner_settings.get("req_fsub_channel") if owner_settings else None
 
-    if fsub_channel:
+    missing_buttons = []
+
+    # 1. Normal Channel Check (User must be a full member)
+    if normal_fsub:
         try:
-            fsub_channel = int(str(fsub_channel).strip())
-            await client.get_chat_member(fsub_channel, requester_id)
+            normal_fsub = int(str(normal_fsub).strip())
+            await client.get_chat_member(normal_fsub, requester_id)
         except UserNotParticipant:
-            # 1. Invite Link Resolve
             try:
-                invite = await client.export_chat_invite_link(fsub_channel)
+                normal_invite = await client.export_chat_invite_link(normal_fsub)
             except Exception:
-                invite = owner_settings.get("fsub_invite_link") or "https://t.me"
+                normal_invite = owner_settings.get("fsub_invite_link") or "https://t.me"
 
-            # 2. Dynamic Channel Title Fetch (With Safe Fallback)
-            ch_title = "Our Official Channel"
+            ch_title = "Main Channel"
             try:
-                chat_info = await client.get_chat(fsub_channel)
+                chat_info = await client.get_chat(normal_fsub)
                 if chat_info and chat_info.title:
                     ch_title = chat_info.title
             except Exception:
                 pass
 
-            # 3. Mention Name Setup
-            user_mention = getattr(message.from_user, "mention", "User")
+            missing_buttons.append([InlineKeyboardButton(f"📢 Join {ch_title}", url=normal_invite)])
+        except Exception:
+            # Restart ke baad access hash miss hone par bypass
+            pass
 
-            # 4. Premium Aesthetic Layout
-            fsub_text = (
-                f"👋 **Hey {user_mention},**\n\n"
-                "🔒 **Access Restricted!**\n"
-                "Aapki file locked hai. File unlock karne ke liye aapko hamara official channel join karna zaroori hai.\n\n"
-                f"📌 **Channel:** `{ch_title}`\n\n"
-                "👇 **Quick Steps:**\n"
-                "1️⃣ Niche **'📢 Join Channel'** par click karke channel join karein.\n"
-                "2️⃣ Wapas aakar **'🔄 Try Again'** button press karein."
-            )
+    # 2. Request-To-Join Channel Check (Pending request allowed)
+    if req_fsub:
+        try:
+            req_fsub = int(str(req_fsub).strip())
+            has_requested = await has_requested_join(requester_id, req_fsub)
+            
+            if not has_requested:
+                # Agar database me entry nahi hai, check karein agar already member ho
+                try:
+                    await client.get_chat_member(req_fsub, requester_id)
+                except UserNotParticipant:
+                    try:
+                        invite_obj = await client.create_chat_invite_link(
+                            chat_id=req_fsub,
+                            creates_join_request=True
+                        )
+                        req_invite = invite_obj.invite_link
+                    except Exception:
+                        req_invite = owner_settings.get("req_fsub_invite_link") or "https://t.me"
 
-            return await message.reply_text(
-                text=fsub_text,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 Join Channel", url=invite)],
-                    [InlineKeyboardButton("🔄 Try Again", callback_data=f"retry_{payload}")]
-                ]),
-                disable_web_page_preview=True
-            )
+                    req_title = "Backup Channel"
+                    try:
+                        req_info = await client.get_chat(req_fsub)
+                        if req_info and req_info.title:
+                            req_title = req_info.title
+                    except Exception:
+                        pass
+
+                    missing_buttons.append([InlineKeyboardButton(f"📩 Request to Join {req_title}", url=req_invite)])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    # 3. Agar koi bhi channel pending hai to lock prompt bhejien
+    if missing_buttons:
+        missing_buttons.append([InlineKeyboardButton("🔄 Try Again", callback_data=f"retry_{payload}")])
+
+        user_mention = getattr(message.from_user, "mention", "User")
+        fsub_text = (
+            f"👋 **Hey {user_mention},**\n\n"
+            "🔒 **Access Restricted!**\n"
+            "Aapki file locked hai. File unlock karne ke liye aapko niche diye gaye channel requirements poore karne honge:\n\n"
+            "1️⃣ **Join Channel:** Main channel join karein.\n"
+            "2️⃣ **Request to Join:** Backup channel me join request bhejien (Approval ka wait nahi karna padega).\n\n"
+            "Dono complete karne ke baad **'🔄 Try Again'** button press karein."
+        )
+
+        return await message.reply_text(
+            text=fsub_text,
+            reply_markup=InlineKeyboardMarkup(missing_buttons),
+            disable_web_page_preview=True
+        )
         except Exception as e:
             # Restart ke baad agar Peer Invalid aaye to freeze hone ke bajaye
             # bypass hokar user ko file mil jaye
