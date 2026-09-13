@@ -9,7 +9,7 @@ from datetime import datetime, time as dt_time, timedelta, UTC
 from pyrogram.enums import ParseMode
 from pyrogram.errors import (
     FloodWait, PeerIdInvalid, MessageNotModified, ChatAdminRequired,
-    ChannelInvalid, UserIsBlocked, ChatForwardsRestricted
+    ChannelInvalid, UserIsBlocked, ChatForwardsRestricted, InputUserDeactivated
 )
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyromod import Client
@@ -18,7 +18,7 @@ from config import Config
 from database.db import (
     get_user, save_file_data, get_post_channels, get_index_db_channel,
     save_post, get_users_with_daily_notify_enabled, get_stats_for_owner,
-    get_monthly_record, update_monthly_record
+    get_monthly_record, update_monthly_record, update_user
 )
 from utils.helpers import create_post, clean_and_parse_filename, notify_and_remove_invalid_channel
 try:
@@ -437,8 +437,9 @@ class Bot(Client):
                         
                     await self.send_message(user_id, text)
                     await asyncio.sleep(1)
-                except UserIsBlocked:
-                    logger.warning(f"STATS: Could not send dashboard to {user_id}, user has blocked the bot.")
+                except (UserIsBlocked, InputUserDeactivated) as e:
+                    logger.warning(f"STATS: User {user_id} unavailable ({e}). Disabling daily notifications.")
+                    await update_user(user_id, 'daily_notify_enabled', False)
                 except Exception as e:
                     logger.error(f"STATS: Failed to send dashboard to user {user_id}: {e}")
 
