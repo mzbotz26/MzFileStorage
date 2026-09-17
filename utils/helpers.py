@@ -452,4 +452,100 @@ async def create_post(client, user_id, messages, cache: dict):
             if lang_clean and lang_clean not in display_tags_parts:
                 display_tags_parts.append(lang_clean)
         
-        dis
+        display_tags = " | ".join(filter(None, display_tags_parts))
+        
+        bot_username = client.me.username
+        link = f"https://t.me/{bot_username}?start=get_{user_id}_{info['file_unique_id']}"
+        file_size_str = format_bytes(info['file_size'])
+        
+        entry = (
+            f"📁 ➤ {display_tags}\n"
+            f"📥 ➪ [Click Here]({link}) ({file_size_str})"
+        )
+        all_link_entries.append(entry)
+
+    mz_footer = "\n\n💪 **Powered By : [𝐌𝐳𝐌𝐨𝐯𝐢𝐢𝐞𝐳](https://t.me/MzMoviiez)**"
+
+    # --- DYNAMIC MULTI-PART CHUNKING [Part 1/2] SYSTEM ---
+    chunks = []
+    current_chunk = []
+    base_header_len = len(f"🔖 **Title: {primary_display_title} [Part 9/9]**\n\n") + len(mz_footer)
+
+    for entry in all_link_entries:
+        candidate_text = "\n\n".join(current_chunk + [entry])
+        if base_header_len + len(candidate_text) > CAPTION_LIMIT and current_chunk:
+            chunks.append(current_chunk)
+            current_chunk = [entry]
+        else:
+            current_chunk.append(entry)
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    total_parts = len(chunks)
+    final_posts = []
+
+    for idx, chunk in enumerate(chunks, 1):
+        if total_parts > 1:
+            part_header = f"🔖 **Title: {primary_display_title} [Part {idx}/{total_parts}]**\n\n"
+        else:
+            part_header = f"🔖 **Title: {primary_display_title}**\n\n"
+
+        final_caption = part_header + "\n\n".join(chunk) + mz_footer
+        post_img = post_poster if idx == 1 else None
+        final_posts.append((post_img, final_caption, footer_keyboard))
+            
+    return final_posts
+
+def calculate_title_similarity(title1: str, title2: str) -> float:
+    return fuzz.token_sort_ratio(title1.lower(), title2.lower())
+
+async def get_title_key(filename: str) -> str:
+    media_info = await clean_and_parse_filename(filename)
+    return media_info['batch_title'] if media_info else None
+
+async def get_file_raw_link(message):
+    return f"https://t.me/c/{str(message.chat.id).replace('-100', '')}/{message.id}"
+
+def natural_sort_key(s):
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'([0-9]+)', s or '')]
+
+async def get_main_menu(user_id):
+    user_settings = await get_user(user_id) or {}
+    text = "✅ **Setup Complete!**\n\nYou can now forward files to your Index Channel." if user_settings.get('index_db_channel') and user_settings.get('post_channels') else "⚙️ **Bot Settings**\n\nChoose an option below to configure the bot."
+    buttons = [
+        [InlineKeyboardButton("🗂️ Manage Channels", callback_data="manage_channels_menu")],
+        [InlineKeyboardButton("🔗 Shortener", callback_data="shortener_menu"), InlineKeyboardButton("🔄 Backup", callback_data="backup_links")],
+        [InlineKeyboardButton("✍️ Filename Link", callback_data="filename_link_menu"), InlineKeyboardButton("👣 Footer Buttons", callback_data="manage_footer")],
+        [InlineKeyboardButton("🖼️ IMDb Poster", callback_data="poster_menu"), InlineKeyboardButton("📂 My Files", callback_data="my_files_1")],
+        [InlineKeyboardButton("📢 FSub", callback_data="fsub_menu"), InlineKeyboardButton("📊 Daily Stats", callback_data="daily_stats_menu")],
+        [InlineKeyboardButton("❓ How to Download", callback_data="how_to_download_menu")]
+    ]
+    return text, InlineKeyboardMarkup(buttons)
+
+async def notify_and_remove_invalid_channel(client, user_id, channel_id, channel_type):
+    try:
+        # Pehle get_chat try karein taaki peer resolve ho sake
+        await client.get_chat(channel_id)
+        await client.get_chat_member(channel_id, "me")
+        return True
+    except (PeerIdInvalid, ChannelInvalid):
+        # Peer cache na hone par channel delete NA karein, sirf ignore karein
+        logger.warning(f"Could not resolve peer cache for {channel_id} during startup/check.")
+        return True
+    except (ChannelPrivate, UserNotParticipant):
+        # Jab bot ko sach me channel se nikaal diya gaya ho tabhi remove karein
+        db_key = 'index_db_channel' if channel_type == 'Index DB' else 'post_channels'
+        user_settings = await get_user(user_id)
+        if isinstance(user_settings.get(db_key), list):
+            await remove_from_list(user_id, db_key, channel_id)
+        else:
+            await update_user(user_id, db_key, None)
+        try:
+            await client.send_message(user_id, f"⚠️ **Channel Inaccessible**\n\nYour {channel_type} Channel (ID: `{channel_id}`) has been removed because the bot is not an admin or participant.")
+        except Exception:
+            pass
+        return False
+    except Exception as e:
+        logger.error(f"Error checking channel {channel_id}: {e}")
+        return True
