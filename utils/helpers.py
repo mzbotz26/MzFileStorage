@@ -470,4 +470,44 @@ async def get_title_key(filename: str) -> str:
     return media_info['batch_title'] if media_info else None
 
 async def get_file_raw_link(message):
-    return f"https://t.me/c/{str(message.chat.id).replace('-100', '')}/{message.id}
+    return f"https://t.me/c/{str(message.chat.id).replace('-100', '')}/{message.id}"
+
+def natural_sort_key(s):
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'([0-9]+)', s or '')]
+
+async def get_main_menu(user_id):
+    user_settings = await get_user(user_id) or {}
+    text = "✅ **Setup Complete!**\n\nYou can now forward files to your Index Channel." if user_settings.get('index_db_channel') and user_settings.get('post_channels') else "⚙️ **Bot Settings**\n\nChoose an option below to configure the bot."
+    buttons = [
+        [InlineKeyboardButton("🗂️ Manage Channels", callback_data="manage_channels_menu")],
+        [InlineKeyboardButton("🔗 Shortener", callback_data="shortener_menu"), InlineKeyboardButton("🔄 Backup", callback_data="backup_links")],
+        [InlineKeyboardButton("✍️ Filename Link", callback_data="filename_link_menu"), InlineKeyboardButton("👣 Footer Buttons", callback_data="manage_footer")],
+        [InlineKeyboardButton("🖼️ IMDb Poster", callback_data="poster_menu"), InlineKeyboardButton("📂 My Files", callback_data="my_files_1")],
+        [InlineKeyboardButton("📢 FSub", callback_data="fsub_menu"), InlineKeyboardButton("📊 Daily Stats", callback_data="daily_stats_menu")],
+        [InlineKeyboardButton("❓ How to Download", callback_data="how_to_download_menu")]
+    ]
+    return text, InlineKeyboardMarkup(buttons)
+
+async def notify_and_remove_invalid_channel(client, user_id, channel_id, channel_type):
+    try:
+        await client.get_chat(channel_id)
+        await client.get_chat_member(channel_id, "me")
+        return True
+    except (PeerIdInvalid, ChannelInvalid):
+        logger.warning(f"Could not resolve peer cache for {channel_id} during startup/check.")
+        return True
+    except (ChannelPrivate, UserNotParticipant):
+        db_key = 'index_db_channel' if channel_type == 'Index DB' else 'post_channels'
+        user_settings = await get_user(user_id)
+        if isinstance(user_settings.get(db_key), list):
+            await remove_from_list(user_id, db_key, channel_id)
+        else:
+            await update_user(user_id, db_key, None)
+        try:
+            await client.send_message(user_id, f"⚠️ **Channel Inaccessible**\n\nYour {channel_type} Channel (ID: `{channel_id}`) has been removed because the bot is not an admin or participant.")
+        except Exception:
+            pass
+        return False
+    except Exception as e:
+        logger.error(f"Error checking channel {channel_id}: {e}")
+        return True
