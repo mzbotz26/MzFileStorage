@@ -308,7 +308,8 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         'New', 'Combined', 'Complete', 'Chapter', 'PSA', 'JC', 'DIDAR', 'StarBoy', 'Movies', 'Mp4',
         'Hindi', 'English', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Japanese', 'Korean', 'Marathi',
         'NF', 'AMZN', 'MAX', 'DSNP', 'ZEE5', 'SONY', 'WEB-DL', 'HDRip', 'WEBRip', 'HEVC', 'x265', 'x264', 'AAC',
-        '1tamilmv', 'www', 'Join Us', 'Day', 'BBHin', 'JioCinema', 'Hotstar', 'SonyLiv', 'Voot'
+        '1tamilmv', 'www', 'Join Us', 'Day', 'BBHin', 'JioCinema', 'Hotstar', 'SonyLiv', 'Voot',
+        'DD5', 'DD', 'DDP', 'Atmos', 'Kbps
     ]
     junk_pattern_re = r'\b(' + r'|'.join(junk_words) + r')\b'
     cleaned_title = re.sub(junk_pattern_re, ' ', title_to_clean, flags=re.IGNORECASE)
