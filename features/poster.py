@@ -124,64 +124,82 @@ async def _find_poster_from_tmdb(query: str, year: str = None):
         "https://api.themoviedb.org/3/search/multi"
     ]
 
+    # Attempts: 1. With year (agar diya ho), 2. Fallback without year (year mismatch se bachne ke liye)
+    attempts = []
+    if year:
+        attempts.append({"api_key": Config.TMDB_API_KEY, "query": query, "include_adult": "false", "year": str(year)})
+    attempts.append({"api_key": Config.TMDB_API_KEY, "query": query, "include_adult": "false"})
+
     async with aiohttp.ClientSession() as session:
         for endpoint in endpoints:
-            # 1. First attempt: search with query directly
-            params = {
-                "api_key": Config.TMDB_API_KEY,
-                "query": query,
-                "include_adult": "false"
-            }
-            try:
-                async with session.get(endpoint, params=params, timeout=10) as resp:
-                    if resp.status != 200:
-                        continue
-                    data = await resp.json()
-                    results = data.get('results', [])
-                    if not results:
-                        continue
+            for params in attempts:
+                # Endpoint specific year param tweak
+                curr_params = params.copy()
+                if "year" in curr_params:
+                    if "movie" in endpoint:
+                        curr_params["primary_release_year"] = curr_params.pop("year")
+                    elif "tv" in endpoint:
+                        curr_params["first_air_date_year"] = curr_params.pop("year")
 
-                    for res in results:
-                        poster = res.get('poster_path')
-                        if not poster:
+                try:
+                    async with session.get(endpoint, params=curr_params, timeout=10) as resp:
+                        if resp.status != 200:
+                            continue
+                        data = await resp.json()
+                        results = data.get('results', [])
+                        if not results:
                             continue
 
-                        title = (res.get('title') or res.get('name') or "").lower().strip()
-                        orig_title = (res.get('original_title') or res.get('original_name') or "").lower().strip()
-                        res_date = res.get('release_date') or res.get('first_air_date') or ""
-                        res_year = res_date[:4]
-                        orig_lang = res.get('original_language', '')
-
-                        is_exact = (query_norm == title or query_norm == orig_title)
-
-                        # Single word logic (e.g. Road)
-                        if is_single_word:
-                            if not is_exact:
+                        # 1. Exact Match Scan (For short titles like 'Road')
+                        for res in results:
+                            poster = res.get('poster_path')
+                            if not poster:
                                 continue
-                            if year and res_year:
-                                try:
-                                    if abs(int(year) - int(res_year)) > 1:
-                                        continue
-                                except ValueError:
-                                    pass
-                            return f"https://image.tmdb.org/t/p/original{poster}"
 
-                        # Multi-word logic (e.g. Maharashtrachi Hasya Jatra)
+                            title = (res.get('title') or res.get('name') or "").lower().strip()
+                            orig_title = (res.get('original_title') or res.get('original_name') or "").lower().strip()
+                            res_date = res.get('release_date') or res.get('first_air_date') or ""
+                            res_year = res_date[:4]
+                            orig_lang = res.get('original_language', '')
+
+                            is_exact = (query_norm == title or query_norm == orig_title)
+
+                            if is_single_word:
+                                if not is_exact:
+                                    continue  # "Road to Perdition" jaisi cheezein yahi drop hongi
+                                
+                                # Year match check (max 1 year gap) OR Hindi/Indian original language
+                                if year and res_year and abs(int(year) - int(res_year)) <= 1:
+                                    return f"https://image.tmdb.org/t/p/original{poster}"
+                                if orig_lang in ['hi', 'mr', 'ta', 'te', 'ml', 'kn']:
+                                    return f"https://image.tmdb.org/t/p/original{poster}"
+
+                        # 2. Multi-word titles (Shows, regional movies)
                         if not is_single_word:
-                            score = max(fuzz.ratio(query_norm, title), fuzz.ratio(query_norm, orig_title)) if fuzz else 0
-                            is_contained = (query_norm in title or title in query_norm or query_norm in orig_title)
-                            
-                            if is_exact or is_contained or score >= 55:
-                                if year and res_year:
-                                    try:
-                                        if abs(int(year) - int(res_year)) > 2:
-                                            continue
-                                    except ValueError:
-                                        pass
-                                return f"https://image.tmdb.org/t/p/original{poster}"
+                            for res in results:
+                                poster = res.get('poster_path')
+                                if not poster:
+                                    continue
 
-            except Exception:
-                continue
+                                title = (res.get('title') or res.get('name') or "").lower().strip()
+                                orig_title = (res.get('original_title') or res.get('original_name') or "").lower().strip()
+                                res_date = res.get('release_date') or res.get('first_air_date') or ""
+                                res_year = res_date[:4]
+
+                                score = max(fuzz.ratio(query_norm, title), fuzz.ratio(query_norm, orig_title)) if fuzz else 0
+                                is_contained = (query_norm in title or title in query_norm or query_norm in orig_title)
+
+                                if is_exact or is_contained or score >= 55:
+                                    if year and res_year:
+                                        try:
+                                            if abs(int(year) - int(res_year)) > 2:
+                                                continue
+                                        except ValueError:
+                                            pass
+                                    return f"https://image.tmdb.org/t/p/original{poster}"
+
+                except Exception:
+                    continue
 
     return None
 
