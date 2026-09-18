@@ -419,12 +419,18 @@ async def create_post(client, user_id, messages, cache: dict):
     else:
         primary_display_title = base_title_clean
     
-    poster_search_query = first_info.get('clean_search_title') or first_info['batch_title'].replace(first_info.get('season_info', ''), '').strip()
+    # Poster query preparation (Crash-proof)
+    season_tag = first_info.get('season_info') or ''
+    raw_batch = first_info.get('batch_title') or ''
+    if season_tag and season_tag in raw_batch:
+        raw_batch = raw_batch.replace(season_tag, '').strip()
+
+    poster_search_query = first_info.get('clean_search_title') or raw_batch or base_title_clean
     poster_search_query = re.sub(r'\b(comedycha\s*5g|comedycha)\b.*$', '', poster_search_query, flags=re.IGNORECASE).strip()
     poster_search_query = re.sub(r'\s+', ' ', poster_search_query).strip()
 
     post_poster = await get_poster(poster_search_query, final_post_year) if user.get('show_poster', True) else None
-    
+
     footer_buttons = user.get('footer_buttons', [])
     footer_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn['name'], url=btn['url'])] for btn in footer_buttons]) if footer_buttons else None
     
