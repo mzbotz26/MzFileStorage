@@ -295,9 +295,11 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     title_to_clean = re.sub(r'(?i)\b(?:DD[\+]?|DDP|AAC|AC3)?\s*2[\.\s_]?0\b', ' ', title_to_clean)
     title_to_clean = re.sub(r'(?i)\b\d{2,4}\s*Kbps\b', ' ', title_to_clean)
 
+    # Sirf tabhi stray number hatayein jab wo title ke aakhiri me chipka ho (e.g. "Show Name 01")
+    # Title ke beech ke numbers (jaise "40 Bhoot", "1920", "Ek Tha Tiger 2") safe rahenge
     is_series_temp = bool(season_info_str or episode_info_str or day_info_str)
     if is_series_temp:
-        title_to_clean = re.sub(r'\b0*\d{1,2}\b', ' ', title_to_clean)
+        title_to_clean = re.sub(r'\s+0*\d{1,2}$', ' ', title_to_clean)
 
     day_match_inline = re.search(r'\b(?:Day|D)\s*\d{1,3}\b.*$', title_to_clean, flags=re.IGNORECASE)
     if day_match_inline:
