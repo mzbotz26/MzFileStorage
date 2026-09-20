@@ -391,7 +391,8 @@ async def create_post(client, user_id, messages, cache: dict):
     media_info_list.sort(key=lambda x: (
         extract_number(x.get('day_info')),
         extract_number(x.get('episode_info')),
-        extract_number(x.get('part_info'))
+        extract_number(x.get('part_info')),
+        x.get('file_size', 0)
     ))
     
     # 🔒 BATCH-WIDE YEAR RESOLUTION
