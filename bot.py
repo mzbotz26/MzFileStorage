@@ -257,7 +257,7 @@ class Bot(Client):
                         sent_message = None
                         try:
                             if poster:
-                                sent_message = await self.execute_with_retry(self.send_photo, chat_id=target_ch_id, photo=poster, caption=caption, reply_markup=footer)
+                                sent_message = await self.execute_with_retry(self.send_photo, chat_id=target_ch_id, photo=poster, caption=caption, reply_markup=footer, has_spoiler=True)
                             else:
                                 sent_message = await self.execute_with_retry(self.send_message, chat_id=target_ch_id, text=caption, reply_markup=footer, disable_web_page_preview=True)
                             if sent_message:
