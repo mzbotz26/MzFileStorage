@@ -257,11 +257,46 @@ class Bot(Client):
                         sent_message = None
                         try:
                             if poster:
-                                sent_message = await self.execute_with_retry(self.send_photo, chat_id=target_ch_id, photo=poster, caption=caption, reply_markup=footer, has_spoiler=True)
+                                try:
+                                    sent_message = await self.execute_with_retry(
+                                        self.send_photo, 
+                                        chat_id=target_ch_id, 
+                                        photo=poster, 
+                                        caption=caption, 
+                                        reply_markup=footer, 
+                                        has_spoiler=True
+                                    )
+                                except Exception as photo_err:
+                                    # Agar Telegram server poster fetch na kar sake toh post drop karne ke bajaye text send kare
+                                    if "WEBPAGE_CURL_FAILED" in str(photo_err) or "MEDIA_EMPTY" in str(photo_err):
+                                        logger.warning(f"Telegram CURL failed for image: {poster}. Falling back to text message.")
+                                        sent_message = await self.execute_with_retry(
+                                            self.send_message, 
+                                            chat_id=target_ch_id, 
+                                            text=caption, 
+                                            reply_markup=footer, 
+                                            disable_web_page_preview=True
+                                        )
+                                    else:
+                                        raise photo_err
                             else:
-                                sent_message = await self.execute_with_retry(self.send_message, chat_id=target_ch_id, text=caption, reply_markup=footer, disable_web_page_preview=True)
+                                sent_message = await self.execute_with_retry(
+                                    self.send_message, 
+                                    chat_id=target_ch_id, 
+                                    text=caption, 
+                                    reply_markup=footer, 
+                                    disable_web_page_preview=True
+                                )
+
                             if sent_message:
-                                await save_post(owner_id=user_id, post_channel_id=target_ch_id, message_id=sent_message.id, poster=poster, caption=caption, reply_markup=footer)
+                                await save_post(
+                                    owner_id=user_id, 
+                                    post_channel_id=target_ch_id, 
+                                    message_id=sent_message.id, 
+                                    poster=poster, 
+                                    caption=caption, 
+                                    reply_markup=footer
+                                )
                         except Exception as e:
                             logger.error(f"Failed to send post to channel {target_ch_id} for user {user_id}: {e}")
                             await self.send_message(user_id, f"❌ **Posting Error!**\nFailed to post to channel `{target_ch_id}`. Error: `{e}`")
