@@ -57,11 +57,10 @@ async def get_spelling_suggestions(query: str, limit: int = 4):
     q_norm = normalize_phonetics(q_words)
     first_char = q_words[0]
 
-    # 1. Pehle akshar se shuru hone wali files ko database se fetch karein (Fast & Accurate)
+    # 1. Database se first letter matching files fetch karein
     char_pattern = re.compile(f"^[\\[\\(]?[\\s._-]*{re.escape(first_char)}", re.IGNORECASE)
     db_files = await files.find({"file_name": {"$regex": char_pattern}}, {"file_name": 1}).to_list(length=500)
 
-    # Agar starting letter se kam files milein, toh recent 300 files fallback lein
     if len(db_files) < 10:
         db_files = await files.find({}, {"file_name": 1}).sort("_id", -1).to_list(length=300)
 
@@ -82,29 +81,30 @@ async def get_spelling_suggestions(query: str, limit: int = 4):
             continue
         seen_titles.add(t_lower)
 
-        # Chhote words ke liye pehla letter same hona compulsory hai
+        # First letter must match
         if q_words[0] != t_lower[0]:
             continue
 
-        # Word length difference bohot zyada nahi hona chahiye (e.g. 5 letter word vs 20 letter sentence)
-        len_diff = abs(len(q_words) - len(t_lower))
-        if len(q_words) <= 6 and len_diff > 4:
-            continue
+        # Title ka pehla word nikalein (e.g., 'pushpa 2 the rule' -> 'pushpa')
+        first_word_in_title = t_lower.split()[0] if t_lower.split() else t_lower
 
-        # Pure String Comparison (No loose partial matching)
+        # 1. Full title comparison
         score_ratio = fuzz.ratio(q_words, t_lower)
         score_token = fuzz.token_sort_ratio(q_words, t_lower)
 
+        # 2. First word comparison (Puspa vs Pushpa)
+        score_first_word = fuzz.ratio(q_norm, normalize_phonetics(first_word_in_title))
+
+        # 3. Phonetic matching
         t_norm = normalize_phonetics(t_lower)
         score_phonetic = fuzz.ratio(q_norm, t_norm)
 
-        best_score = max(score_ratio, score_token, score_phonetic)
+        best_score = max(score_ratio, score_token, score_phonetic, score_first_word)
 
-        # 🎯 Strict matching threshold (65%)
-        if best_score >= 65:
+        # 🎯 60% threshold: Agar pehla word ya title match ho toh add karein
+        if best_score >= 60:
             suggestions.append((best_score, clean_t.title()))
 
-    # Score ke hisaab se sort karke top suggestions return karein
     suggestions.sort(key=lambda x: x[0], reverse=True)
     return [t[1] for t in suggestions[:limit]]
 
