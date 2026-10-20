@@ -112,3 +112,42 @@ async def reset_db_confirm(client, query):
     await query.message.edit_text("⚙️ Resetting files database...")
     deleted_count = await delete_all_files()
     await query.message.edit_text(f"✅ **Success!** Deleted **{deleted_count}** file entries.")
+
+
+# ============================================================
+# 📢 DIRECT MESSAGE (ADMIN TO SPECIFIC USER)
+# ============================================================
+@Client.on_message(filters.command(["dm", "msg", "send"]) & filters.user(Config.ADMIN_ID))
+async def admin_direct_dm_handler(client, message):
+    if len(message.command) < 3:
+        return await message.reply_text(
+            "⚠️ **Sahi Format:**\n\n"
+            "`/dm <user_id> <aapka_message>`\n\n"
+            "**Example:**\n"
+            "`/dm 123456789 Aapne jo format bataya tha wo sahi nahi hai, kripya sirf movie ka official naam likhein.`"
+        )
+
+    try:
+        target_user_id = int(message.command[1])
+        custom_message = message.text.split(maxsplit=2)[2]
+    except ValueError:
+        return await message.reply_text("❌ Galat User ID! Kripya valid numeric Telegram ID enter karein.")
+
+    # User ko bheja jane wala formatted message
+    user_deliver_text = (
+        f"📢 **Message from Admin:**\n\n"
+        f"{custom_message}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Yeh message Bot Admin dwara seedha aapko bheja gaya hai.</i>"
+    )
+
+    try:
+        await client.send_message(
+            chat_id=target_user_id,
+            text=user_deliver_text,
+            parse_mode=enums.ParseMode.HTML
+        )
+        await message.reply_text(f"✅ **Message successfully sent to:** `{target_user_id}`")
+    except Exception as e:
+        await message.reply_text(f"❌ Message send nahi ho saka!\n\n**Reason:** `{e}`")
+        
