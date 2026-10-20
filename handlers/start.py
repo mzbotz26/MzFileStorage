@@ -111,7 +111,7 @@ async def send_file(client, requester_id, owner_id, file_unique_id):
 
         await record_daily_view(owner_id, requester_id)
 
-        stream_message_id = file_data.get('file_id') or file_data.get('stream_id')
+        stream_message_id = file_data.get('stream_id') or file_data.get('file_id')
 
         buttons = [
             [InlineKeyboardButton(
@@ -142,10 +142,20 @@ async def send_file(client, requester_id, owner_id, file_unique_id):
             f"🗑 **File automatically deleted after 10 minutes.**"
         )
 
+        # 🛠️ Fix: Ensure chat_id, from_chat_id, and message_id are strict integers
+        try:
+            target_chat_id = int(requester_id)
+            source_db_channel = int(str(client.owner_db_channel).strip())
+            file_msg_id = int(str(file_data['file_id']).strip())
+        except (ValueError, TypeError) as cast_err:
+            logger.error(f"Invalid integer ID in send_file: {cast_err}")
+            await client.send_message(requester_id, "Sorry, this file reference is corrupted.")
+            return
+
         sent_message = await client.copy_message(
-            chat_id=requester_id,
-            from_chat_id=client.owner_db_channel,
-            message_id=file_data['file_id'],
+            chat_id=target_chat_id,
+            from_chat_id=source_db_channel,
+            message_id=file_msg_id,
             caption=caption,
             reply_markup=keyboard,
             parse_mode=enums.ParseMode.MARKDOWN
