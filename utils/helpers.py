@@ -42,6 +42,8 @@ LANGUAGE_MAP = {
     'mal': 'Malayalam', 'malayalam': 'Malayalam',
     'kan': 'Kannada', 'kannada': 'Kannada',
     'pun': 'Punjabi', 'punjabi': 'Punjabi',
+    'raj': 'Rajasthani', 'rajasthani': 'Rajasthani', 
+    'marwadi': 'Rajasthani', 'marwari': 'Rajasthani',
     'ben': 'Bengali', 'bengali': 'Bengali',
     'mar': 'Marathi', 'marathi': 'Marathi',
     'guj': 'Gujarati', 'gujarati': 'Gujarati',
