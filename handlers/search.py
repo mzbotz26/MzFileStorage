@@ -151,27 +151,34 @@ async def get_spelling_suggestions(query: str, limit: int = 4):
 
 async def execute_search(client, message, query: str):
     """Search process karke formatted output return karta hai."""
-    words = [re.escape(w) for w in query.split() if w]
+    q_clean = query.strip()
+    words = [re.escape(w) for w in q_clean.split() if w]
     
-    # \b (Word boundary) lagane se 'Hi' sirf pure word ko match karega, 'Hindi' ko nahi
-    regex_pattern = r"(?:^|[\s\.\-_\[\(])" + r"[\s\.\-_]+".join(words) + r"(?:$|[\s\.\-_\]\)])"
-    pattern = re.compile(regex_pattern, re.IGNORECASE)
-
-    matching_files = await files.find({"file_name": {"$regex": pattern}}).to_list(length=300)
-    
-    # Agar boundary se match na mile (fallback for normal search)
-    if not matching_files:
-        fallback_pattern = re.compile(r"[\s\.\-_]*".join(words), re.IGNORECASE)
-        # Check karein agar short query (<=3 letters) 'Hindi' tag na utha le
-        if len(query.strip()) <= 3:
-            matching_files = await files.find({
-                "file_name": {"$regex": fallback_pattern},
-                # Extra guard: sirf short query ke waqt check karein
-            }).to_list(length=100)
-            # Filter out files jahan query sirf 'Hindi' tag ka hissa ho
-            matching_files = [f for f in matching_files if not re.search(rf'(?i)hin(?:di)?', f.get('file_name', '')) or re.search(rf'(?i)\b{re.escape(query.strip())}\b', f.get('file_name', ''))]
-        else:
-            matching_files = await files.find({"file_name": {"$regex": fallback_pattern}}).to_list(length=300)
+    # 🎯 1. Agar short query ho (<= 3 letters jaise 'Hi', 'PK'):
+    # Sirf wahi match kare jahan movie ka ASLI TITLE wahi ho (Hi Nanna ya Hi Papa na uthaye)
+    if len(q_clean) <= 3:
+        # Title start se lekar bracket ya year tak match kare
+        short_pattern = re.compile(rf'^(?:\[.*?\]|\(.*?\)|@\w+|\s)*{re.escape(q_clean)}\b(?:\s*[\(\[]?(?:19\d{2}|20\d{2})|\s*$)', re.IGNORECASE)
+        matching_files = await files.find({"file_name": {"$regex": short_pattern}}).to_list(length=100)
+        
+        # Agar exact title nahi mila tabhi boundary search kare
+        if not matching_files:
+            strict_word_pattern = re.compile(rf'(?:^|[\[\(\s._\-]){re.escape(q_clean)}(?:[\]\)\s._\-]|$)', re.IGNORECASE)
+            raw_matches = await files.find({"file_name": {"$regex": strict_word_pattern}}).to_list(length=50)
+            
+            # Filter: Hindi tag wale files ko rokein aur sirf exact parsed title match karein
+            matching_files = []
+            for f in raw_matches:
+                fn = f.get('file_name', '')
+                clean_name = fast_clean_title(fn).strip().lower()
+                # Agar movie ka naam hi 'Hi' ho tabhi allow karein
+                if clean_name == q_clean.lower() or clean_name.startswith(f"{q_clean.lower()} ("):
+                    matching_files.append(f)
+    else:
+        # 🎯 2. Normal movie queries ke liye (> 3 letters)
+        regex_pattern = r"[\s\.\-_]*".join(words)
+        pattern = re.compile(regex_pattern, re.IGNORECASE)
+        matching_files = await files.find({"file_name": {"$regex": pattern}}).to_list(length=300)
 
     # 🛑 FILE NAHI MILI: SPELLING SUGGESTIONS CHECK KAREIN
     if not matching_files:
