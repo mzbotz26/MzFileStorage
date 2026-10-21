@@ -349,12 +349,26 @@ async def execute_search(client, message, query: str):
         asyncio.create_task(auto_delete_message(sent_result_messages, AUTO_DELETE_SECONDS))
 
 
+GREETINGS = {
+    "hi", "hello", "hey", "hlo", "hii", "hiii", 
+    "namaste", "kem cho", "kaise ho", "kya haal hai", "bro", "sir"
+}
+
 @Client.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings"]))
 async def direct_text_search(client, message):
-    query = message.text.strip()
-    if len(query) < 2:
+    raw_text = message.text.strip()
+    query_clean = raw_text.lower()
+    
+    if query_clean in GREETINGS:
+        return await message.reply_text(
+            f"👋 **Namaste {message.from_user.first_name or 'Dost'}!**\n\n"
+            "🎬 Aapko kaunsi movie ya web series chahiye? Kripya uska **poora naam** likhkar bhejein."
+        )
+        
+    if len(raw_text) < 2:
         return await message.reply_text("⚠️ Kripya kam se kam 2 letters ka naam likhein.")
-    await execute_search(client, message, query)
+        
+    await execute_search(client, message, raw_text)
 
 
 # ============================================================
