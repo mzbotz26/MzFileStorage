@@ -71,11 +71,33 @@ def word_level_similarity(q_str: str, target_str: str) -> float:
 
 
 def fast_clean_title(filename: str) -> str:
-    """Filename se quick clean title nikalta hai bina heavy parser overhead ke."""
+    """Filename se channel tags, websites, non-English script aur extra junk hata kar ekdum clean title banata hai."""
+    # 1. Extension remove karein
     name = re.sub(r'\.[a-zA-Z0-9]{2,4}$', '', filename)
+    
+    # 2. Website URLs aur @usernames hatayein
+    name = re.sub(r'(?:https?://\S+|www\.\S+)', ' ', name)
+    name = re.sub(r'@[a-zA-Z0-9_]+', ' ', name)
+    name = re.sub(r'\b[a-zA-Z0-9-]+\.(?:com|org|net|xyz|me|io|in|cc|site|top|fun|live|pro)\b', ' ', name, flags=re.IGNORECASE)
+    
+    # 3. Brackets ke andar ka content (jisme aksar channel tag hota hai jaise [Moviestudioabhi]) drop karein
+    name = re.sub(r'\[.*?\]|\(.*?\)', ' ', name)
+    
+    # 4. Dots, underscores, hyphens ko space banayein
     name = re.sub(r'[\._\-]+', ' ', name)
-    name = re.split(r'\b(19\d{2}|20\d{2}|480p|720p|1080p|2160p|webrip|web-dl|bluray|hevc|x264|x265|aac)\b', name, flags=re.IGNORECASE)[0]
-    name = re.sub(r'[\[\]\(\)\{\}@]', ' ', name).strip()
+    
+    # 5. Non-English (Hindi/Devanagari ya special emojis) characters hatayein
+    name = re.sub(r'[^\x00-\x7F]+', ' ', name)
+    
+    # 6. Common prefixes/tags (jaise Moviestudioabhi wagairah jo bina space ke chipke hote hain)
+    name = re.sub(r'\b(moviestudioabhi|full\s*movie|fullmovie)\b', ' ', name, flags=re.IGNORECASE)
+    
+    # 7. Year, Quality, Codec, Audio tags ke baad ka hissa drop karein
+    name = re.split(r'\b(19\d{2}|20\d{2}|480p|720p|1080p|2160p|4k|ds4k|webrip|web-dl|bluray|hevc|x264|x265|aac)\b', name, flags=re.IGNORECASE)[0]
+    
+    # 8. Extra symbols clean karein aur space fix karein
+    name = re.sub(r'[{}`"\'@~]', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
     return name
 
 
