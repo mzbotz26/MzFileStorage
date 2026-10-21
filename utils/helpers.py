@@ -361,12 +361,23 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     final_title = re.sub(r'^[^\w]+|[^\w]+$', '', final_title).strip()
     final_title = re.sub(r'\s+', ' ', final_title).strip()
 
-    # Movie sequel retention (e.g. Jayanti 2)
-    if not is_series_temp and not protected_prefix:
-        clean_raw_spaced = clean_raw_name.replace('_', ' ').replace('.', ' ')
-        sequel_match = re.search(rf'\b({re.escape(final_title)})\s+([2-9]|1[0-9])\b', clean_raw_spaced, re.IGNORECASE)
-        if sequel_match:
-            final_title = f"{final_title} {sequel_match.group(2)}"
+    # 🔒 Movie sequel aur Title numbers retention (e.g. Table No 21, Jayanti 2, Case No 99, 420)
+    if not is_series_temp:
+        clean_raw_spaced = re.sub(r'[\(\[\{].*?[\)\]\}]', ' ', clean_raw_name).replace('_', ' ').replace('.', ' ')
+        # 1. Agar title 'No', 'Case', 'Article', 'Section' par khatam ho raha ho toh aage ka number le lein
+        prefix_num_match = re.search(rf'\b({re.escape(final_title)})\s*(\.?\s*\d{{1,3}})\b', clean_raw_spaced, re.IGNORECASE)
+        if prefix_num_match:
+            num_part = prefix_num_match.group(2).replace('.', '').strip()
+            # Ensure karein ye year na ho (e.g. 2013)
+            if not (len(num_part) == 4 and (num_part.startswith("19") or num_part.startswith("20"))):
+                final_title = f"{final_title} {num_part}".strip()
+        else:
+            # 2. General sequels (Part 2, 3, etc.)
+            sequel_match = re.search(rf'\b({re.escape(final_title)})\s+([2-9]|[1-9]\d)\b', clean_raw_spaced, re.IGNORECASE)
+            if sequel_match:
+                seq_num = sequel_match.group(2).strip()
+                if not (len(seq_num) == 4 and (seq_num.startswith("19") or seq_num.startswith("20"))):
+                    final_title = f"{final_title} {seq_num}".strip()
 
     final_year = extracted_year or year_from_filename or definitive_year
     is_series = bool(season_info_str) or bool(episode_info_str) or bool(day_info_str)
