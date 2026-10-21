@@ -350,7 +350,7 @@ async def execute_search(client, message, query: str):
 
 
 GREETINGS = {
-    "hi", "hello", "hey", "hlo", "hii", "hiii", 
+    "hello", "hey", "hlo", "hii", "hiii", 
     "namaste", "kem cho", "kaise ho", "kya haal hai", "bro", "sir"
 }
 
