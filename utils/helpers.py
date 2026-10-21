@@ -115,7 +115,7 @@ async def get_definitive_title_from_imdb(title_from_filename):
 
 def extract_year_from_filename(filename: str) -> int | None:
     clean_fn = filename.replace('\xa0', ' ').replace('\u200b', ' ')
-    bracket_match = re.search(r'[\(\[]\s*(19\d{2}|20\d{2})\s*[\)\]]', clean_fn)
+    bracket_match = re.search(r'[\(\[\{]\s*(19\d{2}|20\d{2})\s*[\)\]\}]', clean_fn)
     if bracket_match:
         return int(bracket_match.group(1))
     
@@ -218,7 +218,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
             if ep_direct:
                 episode_info_str = f"EP {int(ep_direct.group(1))}"
 
-    name_for_ptn = re.sub(r'\[.*?\]|\(.*?\)', ' ', name_for_parsing)
+    name_for_ptn = re.sub(r'\[.*?\]|\(.*?\)|(\{.*?\})', ' ', name_for_parsing)
     name_for_ptn = re.sub(r'\b(?:Ep|Episode|Epi|E)?\s*\d{1,4}\s*(?:[-–—toTo]|\s+)\s*\d{1,4}\b', ' ', name_for_ptn, flags=re.IGNORECASE)
     name_for_ptn = re.sub(r'\b(?:Ep|Episode|Epi|E)\s*\d{1,4}\b', ' ', name_for_ptn, flags=re.IGNORECASE)
     name_for_ptn = re.sub(r'\s+', ' ', name_for_ptn).strip()
