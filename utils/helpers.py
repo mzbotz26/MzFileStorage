@@ -226,8 +226,10 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     parsed_info = PTN.parse(name_for_ptn)
     
     initial_title = parsed_info.get('title', '').strip()
-    initial_title = re.sub(r'^(?:\d+\s*[-_.]?\s*)+(?=[A-Za-z])', '', initial_title)
-    
+    # Sirf tabhi number katega jab uske baad dot, dash ya underscore ho (jaise '01. Movie' ya '01 - Movie')
+    # Normal title jaise '9 Hours', '3 Idiots', '12 Fail' ka number safe rahega
+    initial_title = re.sub(r'^\d+\s*[-_.]\s*(?=[A-Za-z])', '', initial_title)
+
     if not season_info_str and parsed_info.get('season'):
         s_val = parsed_info.get('season')
         try:
