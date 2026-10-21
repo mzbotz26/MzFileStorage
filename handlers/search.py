@@ -383,9 +383,13 @@ async def direct_text_search(client, message):
     query_clean = raw_text.lower()
     
     if query_clean in GREETINGS:
+        user_name = message.from_user.first_name or "Dost"
+        user_link = f"[{user_name}](tg://user?id={message.from_user.id})"
+
         return await message.reply_text(
-            f"👋 **Namaste {message.from_user.first_name or 'Dost'}!**\n\n"
-            "🎬 Aapko kaunsi movie ya web series chahiye? Kripya uska **poora naam** likhkar bhejein."
+            f"👋 **Namaste {user_link}!**\n\n"
+            "🎬 Aapko kaunsi movie ya web series chahiye? Kripya uska **poora naam** likhkar bhejein.",
+            disable_web_page_preview=True
         )
         
     if len(raw_text) < 2:
