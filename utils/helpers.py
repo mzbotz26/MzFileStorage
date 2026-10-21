@@ -336,6 +336,9 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     junk_pattern_re = r'\b(' + r'|'.join(junk_words) + r')\b'
     cleaned_title = re.sub(junk_pattern_re, ' ', title_to_clean, flags=re.IGNORECASE)
     cleaned_title = re.sub(r'[-_.]', ' ', cleaned_title)
+    # Title ke aakhiri me chipka 'Aud', 'Dual', 'Dub' hataayein
+    cleaned_title = re.sub(r'\b(aud|audio|dual|dub|uncut)\b\s*$', '', cleaned_title, flags=re.IGNORECASE)
+    cleaned_title = cleaned_title.strip()
 
     if re.search(r'bigg\s*boss', cleaned_title, re.IGNORECASE):
         cleaned_title = re.sub(r'\b(bigg\s*boss)\b.*$', r'\1', cleaned_title, flags=re.IGNORECASE).strip()
