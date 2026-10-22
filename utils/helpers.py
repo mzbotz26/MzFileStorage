@@ -185,7 +185,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
                 break
 
     name_for_parsing = clean_name_ascii.replace('_', ' ').replace('.', ' ')
-    name_for_parsing = re.sub(r'(?:www\.)?[\w-]+\.(?:com|org|net|xyz|me|io|in|cc|biz|world|info|club|mobi|press|top|site|tech|online|store|live|co|shop|fun|tamilmv)\b', '', name_for_parsing, flags=re.IGNORECASE)
+    name_for_parsing = re.sub(r'(?:www\.)?[\w-]+\.(?:com|org|net|xyz|me|io|in|cc|biz|world|info|club|mobi|press|top|site|tech|online|store|live|co|shop|fun|tamilmv|vip|link|space|buzz|app|tv)\b', '', name_for_parsing, flags=re.IGNORECASE)
     name_for_parsing = re.sub(r'@[a-zA-Z0-9_]+', '', name_for_parsing).strip()
     name_for_parsing = re.sub(r'\bDS-?4K\b', ' ', name_for_parsing, flags=re.IGNORECASE)
 
