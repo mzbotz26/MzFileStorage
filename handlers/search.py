@@ -327,12 +327,6 @@ GREETINGS = {
     "namaste", "kem cho", "kaise ho", "kya haal hai", "bro", "sir"
 }
 
-COMMAND_WORDS = {
-    "start": "Bot ko start karne ke liye /start dabayein.",
-    "settings": "Settings open karne ke liye /settings dabayein.",
-    "help": "Madad ke liye /help dabayein ya movie ka poora naam likhein."
-}
-
 @Client.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings"]))
 async def direct_text_search(client, message):
     raw_text = message.text.strip()
@@ -504,4 +498,11 @@ async def verify_log_callback(client, callback_query):
     )
 
     try:
-        await cal
+        await callback_query.message.edit_text(
+            text=updated_log,
+            reply_markup=None,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+        await callback_query.answer(f"Action Done: {status_label}", show_alert=True)
+    except Exception:
+        pass
