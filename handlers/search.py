@@ -332,9 +332,6 @@ async def direct_text_search(client, message):
     raw_text = message.text.strip()
     query_clean = raw_text.lower()
 
-    if query_clean in COMMAND_WORDS:
-        return await message.reply_text(f"ℹ️ {COMMAND_WORDS[query_clean]}")
-
     if query_clean in GREETINGS:
         user_name = message.from_user.first_name or "Dost"
         user_link = f"[{user_name}](tg://user?id={message.from_user.id})"
