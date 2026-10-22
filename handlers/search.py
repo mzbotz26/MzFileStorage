@@ -200,13 +200,13 @@ async def execute_search(client, message, query: str):
         if suggestions:
             return await message.reply_text(
                 f"🤔 **'{query}'** naam se koi file nahi mili.\n\n"
-                f"Kya aap inme se kuch dhoondh rahe hain? Ya request bhejne ke liye niche button dabayein 👇",
+                f"Kya aap inme se kuch dhoondh rahe hain? Ya Admin ko upload request bhejne ke liye niche **Request Button** par click karein 👇",
                 reply_markup=reply_markup
             )
         else:
             return await message.reply_text(
                 f"❌ **'{query}'** abhi database mein available nahi hai.\n\n"
-                f"Admin ko upload request bhejne ke liye niche button par click karein 👇",
+                f"Admin ko upload request bhejne ke liye niche **Request Button** par click karein 👇",
                 reply_markup=reply_markup
             )
 
