@@ -333,11 +333,24 @@ GREETINGS = {
     "namaste", "kem cho", "kaise ho", "kya haal hai", "bro", "sir"
 }
 
+BLOCKED_SEARCH_KEYWORDS = {
+    # Languages
+    "hindi", "english", "tamil", "telugu", "malayalam", "kannada", 
+    "punjabi", "bengali", "marathi", "gujarati", "bhojpuri", "urdu",
+    "korean", "japanese", "chinese", "spanish", "french", "german",
+    
+    # Audio & Release Tags
+    "dubbed", "dual", "multi", "audio", "dual audio", "multi audio",
+    "webrip", "web-dl", "bluray", "hdrip", "hevc", "x264", "x265",
+    "480p", "720p", "1080p", "2160p", "4k", "movie", "movies", "series"
+}
+
 @Client.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings"]))
 async def direct_text_search(client, message):
     raw_text = message.text.strip()
     query_clean = raw_text.lower()
 
+    # 1. Greetings Filter
     if query_clean in GREETINGS:
         user_name = message.from_user.first_name or "Dost"
         user_link = f"[{user_name}](tg://user?id={message.from_user.id})"
@@ -348,6 +361,14 @@ async def direct_text_search(client, message):
             disable_web_page_preview=True
         )
 
+    # 🛑 2. Block Standalone Languages / Junk Words Search
+    if query_clean in BLOCKED_SEARCH_KEYWORDS:
+        return await message.reply_text(
+            f"⚠️ **'{raw_text}'** koi movie ya series ka naam nahi hai.\n\n"
+            "🎬 Kripya aapko jo **Movie ya Web Series** chahiye, uska **poora naam** likhkar search karein (jaise: `Pathaan`, `Pushpa 2`)."
+        )
+
+    # 3. Minimum Length Check
     if len(raw_text) < 2:
         return await message.reply_text("⚠️ Kripya kam se kam 2 letters ka naam likhein.")
 
