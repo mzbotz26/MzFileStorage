@@ -89,9 +89,14 @@ def fast_clean_title(filename: str) -> str:
     # 5. Non-English (Hindi/Devanagari ya special emojis) characters hatayein
     name = re.sub(r'[^\x00-\x7F]+', ' ', name)
     
-    # 6. Common prefixes/tags
-    name = re.sub(r'\b(moviestudioabhi|full\s*movie|fullmovie)\b', ' ', name, flags=re.IGNORECASE)
-    
+    # 6. Common website / uploader prefixes & tags
+    name = re.sub(
+        r'\b(themoviesboss|moviesboss|moviestudioabhi|vegamovies|bollyflix|topmovies|katmoviehd|mkvcinemas|luxmovies|full\s*movie|fullmovie)\b', 
+        ' ', 
+        name, 
+        flags=re.IGNORECASE
+    )
+
     # 7. Year, Quality, Codec, Audio tags ke baad ka hissa drop karein
     name = re.split(r'\b(19\d{2}|20\d{2}|480p|720p|1080p|2160p|4k|ds4k|webrip|web-dl|bluray|hevc|x264|x265|aac)\b', name, flags=re.IGNORECASE)[0]
     
