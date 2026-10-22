@@ -78,8 +78,9 @@ def fast_clean_title(filename: str) -> str:
     # 2. Website URLs aur @usernames hatayein
     name = re.sub(r'(?:https?://\S+|www\.\S+)', ' ', name)
     name = re.sub(r'@[a-zA-Z0-9_]+', ' ', name)
-    name = re.sub(r'\b[a-zA-Z0-9-]+\.(?:com|org|net|xyz|me|io|in|cc|site|top|fun|live|pro)\b', ' ', name, flags=re.IGNORECASE)
-    
+    # Sabhi standard aur custom domains hataayein
+    name = re.sub(r'\b[a-zA-Z0-9-]+\.(?:com|org|net|xyz|me|io|in|cc|site|top|fun|live|pro|vip|link|space|buzz|online|store|club|app|info|tv)\b', ' ', name, flags=re.IGNORECASE)
+
     # 3. Brackets ke andar ka content drop karein
     name = re.sub(r'\[.*?\]|\(.*?\)|(\{.*?\})', ' ', name)
     
