@@ -226,9 +226,14 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     parsed_info = PTN.parse(name_for_ptn)
     
     initial_title = parsed_info.get('title', '').strip()
-    # Sirf tabhi number katega jab uske baad dot, dash ya underscore ho (jaise '01. Movie' ya '01 - Movie')
-    # Normal title jaise '9 Hours', '3 Idiots', '12 Fail' ka number safe rahega
-    initial_title = re.sub(r'^\d+\s*[-_.]\s*(?=[A-Za-z])', '', initial_title)
+    
+    # 🎯 Agar title khali ho ya sirf number ho (e.g. 418, 300, 1920)
+    if not initial_title:
+        # Year ya quality tag aane se pehle ka hissa direct nikaalein
+        raw_before_tags = re.split(r'[\s._-]+(?:19\d{2}|20\d{2}|480p|720p|1080p|2160p|4k|hdtc|web-?dl|bluray)\b', clean_name_ascii, flags=re.IGNORECASE)[0]
+        initial_title = raw_before_tags.replace('.', ' ').replace('_', ' ').strip()
+    else:
+        initial_title = re.sub(r'^\d+\s*[-_.]\s*(?=[A-Za-z])', '', initial_title)
 
     if not season_info_str and parsed_info.get('season'):
         s_val = parsed_info.get('season')
