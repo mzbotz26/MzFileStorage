@@ -355,7 +355,9 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     cleaned_title = re.sub(r'\s+', ' ', cleaned_title).strip()
     
     if not cleaned_title: 
-        cleaned_title = " ".join(clean_name_ascii.split('.')[:-1])
+        # Sirf pehla segment lein, poora filename nahi
+        fallback_raw = clean_name_ascii.split('.')[0]
+        cleaned_title = fallback_raw.replace('_', ' ').replace('-', ' ').strip()
 
     definitive_title, definitive_year = await get_definitive_title_from_imdb(cleaned_title)
 
