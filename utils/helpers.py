@@ -428,7 +428,31 @@ async def create_post(client, user_id, messages, cache: dict):
         numbers = re.findall(r'\d+', s or '')
         return int(numbers[0]) if numbers else 0
 
+    # 🎯 Quality Order: 480p -> 540p -> 720p HEVC -> 720p -> 1080p HEVC -> 1080p -> 4K
+    def get_quality_order(item):
+        q_tag = (item.get('quality_tags') or '').lower()
+        title_tag = (item.get('display_title') or '').lower()
+        combined = f"{q_tag} {title_tag}"
+
+        is_hevc = any(c in combined for c in ['hevc', 'x265', 'h265', '10bit'])
+
+        if '480p' in combined:
+            return 10
+        elif '540p' in combined:
+            return 15
+        elif '720p' in combined:
+            return 20 if is_hevc else 25
+        elif '1080p' in combined:
+            return 30 if is_hevc else 35
+        elif any(k in combined for k in ['2160p', '4k', 'uhd']):
+            return 40
+        return 50
+
+    # 1. Quality Rank (540p -> 720p)
+    # 2. Episode / Day Order (EP 01-10 -> EP 11-20)
+    # 3. File Size
     media_info_list.sort(key=lambda x: (
+        get_quality_order(x),
         extract_number(x.get('day_info')),
         extract_number(x.get('episode_info')),
         extract_number(x.get('part_info')),
