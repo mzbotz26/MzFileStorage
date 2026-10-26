@@ -478,4 +478,224 @@ async def execute_search(client, message, query: str):
                 text=post_text,
                 reply_markup=reply_markup,
                 parse_mode=enums.ParseMode.MARKDOWN,
-      
+                disable_web_page_preview=True
+            )
+            sent_result_messages.append(sent_msg)
+
+            if total_parts > 1:
+                await asyncio.sleep(0.6)
+
+    if sent_result_messages:
+        asyncio.create_task(auto_delete_message(sent_result_messages, AUTO_DELETE_SECONDS))
+
+
+GREETINGS = {
+    "hello", "hey", "hlo", "hii", "hiii", 
+    "namaste", "kem cho", "kaise ho", "kya haal hai", "bro", "sir"
+}
+
+BLOCKED_SEARCH_KEYWORDS = {
+    # Languages
+    "hindi", "english", "tamil", "telugu", "malayalam", "kannada", 
+    "punjabi", "bengali", "marathi", "gujarati", "bhojpuri", "urdu",
+    "korean", "japanese", "chinese", "spanish", "french", "german",
+    
+    # Audio & Release Tags
+    "dubbed", "dual", "multi", "audio", "dual audio", "multi audio",
+    "webrip", "web-dl", "bluray", "hdrip", "hevc", "x264", "x265",
+    "480p", "720p", "1080p", "2160p", "4k", "movie", "movies", "series"
+}
+
+@Client.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings"]))
+async def direct_text_search(client, message):
+    raw_text = message.text.strip()
+    query_clean = raw_text.lower()
+
+    # 1. Greetings Filter
+    if query_clean in GREETINGS:
+        user_name = message.from_user.first_name or "Dost"
+        user_link = f"[{user_name}](tg://user?id={message.from_user.id})"
+
+        return await message.reply_text(
+            f"👋 **Namaste {user_link}!**\n\n"
+            "🎬 Aapko kaunsi movie ya web series chahiye? Kripya uska **poora naam** likhkar bhejein.",
+            disable_web_page_preview=True
+        )
+
+    # 🛑 2. Block Standalone Languages / Junk Words Search
+    if query_clean in BLOCKED_SEARCH_KEYWORDS:
+        return await message.reply_text(
+            f"⚠️ **'{raw_text}'** koi movie ya series ka naam nahi hai.\n\n"
+            "🎬 Kripya aapko jo **Movie ya Web Series** chahiye, uska **poora naam** likhkar search karein (jaise: `Pathaan`, `Pushpa 2`)."
+        )
+
+    # 3. Minimum Length Check
+    if len(raw_text) < 2:
+        return await message.reply_text("⚠️ Kripya kam se kam 2 letters ka naam likhein.")
+
+    await execute_search(client, message, raw_text)
+
+
+# ============================================================
+# 💡 SPELLING SUGGESTION BUTTON CLICK HANDLER
+# ============================================================
+@Client.on_callback_query(filters.regex(r"^spell_"))
+async def spelling_click_handler(client, callback_query):
+    suggested_title = callback_query.data.split("_", 1)[1]
+    await callback_query.answer(f"Searching: {suggested_title}...")
+    try:
+        await callback_query.message.delete()
+    except Exception:
+        pass
+    await execute_search(client, callback_query.message, suggested_title)
+
+
+# ============================================================
+# 📢 MANUAL USER REQUEST BUTTON HANDLER (Log spam se bachata hai)
+# ============================================================
+@Client.on_callback_query(filters.regex(r"^req_"))
+async def user_request_handler(client, callback_query):
+    req_q = callback_query.data.split("req_", 1)[1].replace("_", " ").strip()
+    user = callback_query.from_user
+    user_name = user.first_name or "User"
+    username_str = f"@{user.username}" if user.username else "No Username"
+    user_id = user.id
+
+    ist_now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
+    time_str = ist_now.strftime("%Y-%m-%d %I:%M:%S %p")
+
+    alert_text = (
+        f"🚨 **New Movie / Series Request!**\n\n"
+        f"🎬 **Query:** `{req_q}`\n"
+        f"👤 **User:** [{user_name}](tg://user?id={user_id}) ({username_str})\n"
+        f"🆔 **User ID:** `{user_id}`\n"
+        f"📅 **Time:** `{time_str} IST`\n\n"
+        f"Select action to respond to user:"
+    )
+
+    safe_q = callback_query.data.split("req_", 1)[1]
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Uploaded", callback_data=f"res_{user_id}_up_{safe_q}"),
+            InlineKeyboardButton("❌ Not Available", callback_data=f"res_{user_id}_na_{safe_q}")
+        ],
+        [
+            InlineKeyboardButton("⏳ Not Released", callback_data=f"res_{user_id}_nr_{safe_q}"),
+            InlineKeyboardButton("✍️ Spell Mistake", callback_data=f"res_{user_id}_sp_{safe_q}")
+        ]
+    ])
+
+    vlog_channel = await get_verify_log_channel(Config.ADMIN_ID)
+    target_chat = int(vlog_channel) if vlog_channel else Config.ADMIN_ID
+
+    try:
+        await client.send_message(
+            chat_id=target_chat,
+            text=alert_text,
+            reply_markup=buttons,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+    except Exception:
+        try:
+            await client.send_message(
+                chat_id=Config.ADMIN_ID,
+                text=alert_text,
+                reply_markup=buttons,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+        except Exception:
+            pass
+
+    await callback_query.answer("✅ Request Admin ko bhej di gayi hai!", show_alert=True)
+    try:
+        await callback_query.message.edit_text(
+            f"✅ **'{req_q}'** ki request Admin ko successfully bhej di gayi hai.\n\n"
+            f"Update aate hi aapko notify kiya jayega!"
+        )
+    except Exception:
+        pass
+
+
+# ============================================================
+# 🎯 VERIFY LOG CHANNEL CALLBACK HANDLER (Admin Response)
+# ============================================================
+@Client.on_callback_query(filters.regex(r"^res_"))
+async def verify_log_callback(client, callback_query):
+    if callback_query.from_user.id != Config.ADMIN_ID:
+        return await callback_query.answer("⚠️ Sirf Admin action le sakta hai!", show_alert=True)
+
+    parts = callback_query.data.split("_", 3)
+    target_user_id = int(parts[1])
+    action = parts[2]
+    movie_name = parts[3].replace("_", " ") if len(parts) > 3 else "Requested Movie"
+    movie_title = movie_name.title()
+
+    if action == "up":
+        user_text = (
+            f"🎉 **Good News!**\n\n"
+            f"Aapka requested show/movie **'{movie_title}'** channel/bot par upload ho chuka hai! 🎬\n\n"
+            f"Abhi download karne ke liye niche diye gaye **Download Movie** button par click karein 👇"
+        )
+        status_label = "✅ Uploaded"
+        safe_cb = movie_title[:30]
+        user_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📥 Download Movie Now", callback_data=f"spell_{safe_cb}")]
+        ])
+    elif action == "na":
+        user_text = (
+            f"⚠️ **Request Update:**\n\n"
+            f"Aapki search ki gayi movie/show **'{movie_title}'** filhal kisi bhi source par available nahi hai.\n\n"
+            f"Jaise hi yeh milegi, channel par add kar di jayegi."
+        )
+        status_label = "❌ Not Available"
+        user_keyboard = None
+    elif action == "nr":
+        user_text = (
+            f"⏳ **Request Update:**\n\n"
+            f"Movie/Show **'{movie_title}'** abhi tak digital release nahi hui hai.\n\n"
+            f"Official release ke baad ise upload kar diya jayegi."
+        )
+        status_label = "⏳ Not Released"
+        user_keyboard = None
+    elif action == "sp":
+        user_text = (
+            f"✍️ **Spelling Check:**\n\n"
+            f"Aapne jo naam likha tha (**'{movie_name}'**), lagta hai usme spelling mistake hai.\n\n"
+            f"Kripya sahi spelling ke sath dubara search karein."
+        )
+        status_label = "✍️ Spell Mistake"
+        user_keyboard = None
+    else:
+        return await callback_query.answer("Unknown action", show_alert=True)
+
+    try:
+        await client.send_message(
+            chat_id=target_user_id,
+            text=user_text,
+            reply_markup=user_keyboard,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        return await callback_query.answer(f"Failed to send to user: {e}", show_alert=True)
+
+    ist_now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
+    resolved_time = ist_now.strftime("%I:%M:%S %p")
+    admin_name = callback_query.from_user.first_name or "Admin"
+
+    updated_log = (
+        f"{callback_query.message.text}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 **Status:** `{status_label}`\n"
+        f"👮‍♂️ **Action By:** {admin_name}\n"
+        f"⏰ **Time:** `{resolved_time} IST`"
+    )
+
+    try:
+        await callback_query.message.edit_text(
+            text=updated_log,
+            reply_markup=None,
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+        await callback_query.answer(f"Action Done: {status_label}", show_alert=True)
+    except Exception:
+        pass
