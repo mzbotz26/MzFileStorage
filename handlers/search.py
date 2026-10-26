@@ -321,7 +321,7 @@ async def execute_search(client, message, query: str):
 
         if suggestions:
             for s_title in suggestions:
-                safe_cb = s_title[:30]
+                safe_cb = s_title[:60]
                 btn_rows.append([InlineKeyboardButton(f"🎬 {s_title}", callback_data=f"spell_{safe_cb}")])
 
         safe_q = re.sub(r'[^a-zA-Z0-9]', '_', core_title[:20]).strip('_')
