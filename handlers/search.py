@@ -78,16 +78,15 @@ def fast_clean_title(filename: str) -> str:
     # 2. Website URLs aur @usernames hatayein
     name = re.sub(r'(?:https?://\S+|www\.\S+)', ' ', name)
     name = re.sub(r'@[a-zA-Z0-9_]+', ' ', name)
-    # Sabhi standard aur custom domains hataayein
     name = re.sub(r'\b[a-zA-Z0-9-]+\.(?:com|org|net|xyz|me|io|in|cc|site|top|fun|live|pro|vip|link|space|buzz|online|store|club|app|info|tv)\b', ' ', name, flags=re.IGNORECASE)
-
+    
     # 3. Brackets ke andar ka content drop karein
     name = re.sub(r'\[.*?\]|\(.*?\)|(\{.*?\})', ' ', name)
     
-    # 4. Dots, underscores, hyphens ko space banayein
-    name = re.sub(r'[\._\-]+', ' ', name)
+    # 4. Dots, underscores, hyphens, colons ko space banayein
+    name = re.sub(r'[\._\-:]+', ' ', name)
     
-    # 5. Non-English (Hindi/Devanagari ya special emojis) characters hatayein
+    # 5. Non-English characters hatayein
     name = re.sub(r'[^\x00-\x7F]+', ' ', name)
     
     # 6. Common website / uploader prefixes & tags
@@ -97,18 +96,22 @@ def fast_clean_title(filename: str) -> str:
         name, 
         flags=re.IGNORECASE
     )
-
+    
     # 7. Year, Quality, Codec, Audio tags ke baad ka hissa drop karein
     name = re.split(r'\b(19\d{2}|20\d{2}|480p|720p|1080p|2160p|4k|ds4k|webrip|web-dl|bluray|hevc|x264|x265|aac)\b', name, flags=re.IGNORECASE)[0]
     
-    # 8. Extra symbols clean karein aur space fix karein
-    name = re.sub(r'[{}`"\'@~]', ' ', name)
+    # 8. Extra symbols aur trailing language tags clean karein
+    name = re.sub(r'\b(hindi|english|tamil|telugu|marathi|bengali|punjabi|kannada|malayalam)\b', ' ', name, flags=re.IGNORECASE)
+    name = re.sub(r'[{}`"\'@~:;]', ' ', name)
     name = re.sub(r'\s+', ' ', name).strip()
     return name
 
 
 async def get_spelling_suggestions(query: str, limit: int = 4):
-    """Universal suggestion engine jo kisi bhi typo ko accurately match karega."""
+    """Universal suggestion engine jo kisi bhi typo ko accurately match karega aur duplicates remove karega."""
+    query_year_match = re.search(r'\b(19\d{2}|20\d{2})\b', query)
+    query_year = query_year_match.group(1) if query_year_match else None
+
     q_clean = re.sub(r'\b(19\d{2}|20\d{2})\b', '', query).strip().lower()
     if not q_clean or len(q_clean) < 2:
         return []
@@ -137,16 +140,21 @@ async def get_spelling_suggestions(query: str, limit: int = 4):
         if len(clean_t) < 2:
             continue
 
-        t_lower = clean_t.lower()
-        if t_lower in seen_titles:
+        # Strict normalization taaki duplicate titles filter ho sakein
+        norm_key = re.sub(r'[^a-zA-Z0-9]', '', clean_t.lower())
+        if norm_key in seen_titles:
             continue
-        seen_titles.add(t_lower)
+        seen_titles.add(norm_key)
 
-        score_full_token = fuzz.token_sort_ratio(q_clean, t_lower)
-        score_full_ratio = fuzz.ratio(q_clean, t_lower)
-        score_words = word_level_similarity(q_clean, t_lower)
+        score_full_token = fuzz.token_sort_ratio(q_clean, clean_t.lower())
+        score_full_ratio = fuzz.ratio(q_clean, clean_t.lower())
+        score_words = word_level_similarity(q_clean, clean_t.lower())
 
         final_score = max(score_full_token, score_full_ratio, score_words)
+
+        # 🎯 Agar filename me user ka search kiya gaya Year bhi maujood hai, toh extra priority dein
+        if query_year and query_year in raw_fname:
+            final_score += 15
 
         if final_score >= 60:
             suggestions.append((final_score, clean_t.title()))
