@@ -289,8 +289,8 @@ async def execute_search(client, message, query: str):
                 if clean_name == core_title.lower() or clean_name.startswith(f"{core_title.lower()} ("):
                     matching_files.append(f)
     else:
-        # 🎯 2. Normal movie queries ke liye
-        regex_pattern = r"[\s\.\-_]*".join(core_words)
+        # 🎯 2. Normal movie queries ke liye (Word boundary lagayi taaki 'Deva' sirf complete word match kare, 'Devata' ya 'Maadeva' na uthaye)
+        regex_pattern = r"\b" + r"[\s\.\-_]+".join(core_words) + r"\b"
         pattern = re.compile(regex_pattern, re.IGNORECASE)
         matching_files = await files.find({"file_name": {"$regex": pattern}}).to_list(length=300)
 
