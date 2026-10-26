@@ -289,12 +289,21 @@ async def execute_search(client, message, query: str):
                 if clean_name == core_title.lower() or clean_name.startswith(f"{core_title.lower()} ("):
                     matching_files.append(f)
     else:
-        # 🎯 2. Normal movie queries ke liye: Safe Boundary Matching
-        # Yeh 'Deva' me 'Devata' ya 'Maadeva' ko rokega, par 'Dhappa' ko turant match karega!
-        joined_words = r"[\s._-]+".join(core_words)
-        regex_pattern = rf"(?:^|[^\w]){joined_words}(?:$|[^\w])"
-        pattern = re.compile(regex_pattern, re.IGNORECASE)
-        matching_files = await files.find({"file_name": {"$regex": pattern}}).to_list(length=300)
+        # 🎯 2. Normal movie queries ke liye: Robust & Substring-Proof Search
+        # Safe match: 'Deva' par 'Devata' ya 'Maadeva' match nahi hoga, par 'Dhappa' turant match karega
+        safe_pattern = r"(?:^|[^a-zA-Z0-9])" + r"[\s._-]+".join(core_words) + r"(?:[^a-zA-Z0-9]|$)"
+        matching_files = await files.find({"file_name": {"$regex": safe_pattern, "$options": "i"}}).to_list(length=300)
+
+        # Fallback: Agar kisi file ke formatting me safe_pattern miss ho, toh secondary check karein
+        if not matching_files:
+            fallback_pattern = r"[\s._-]+".join(core_words)
+            raw_candidates = await files.find({"file_name": {"$regex": fallback_pattern, "$options": "i"}}).to_list(length=300)
+            
+            for f in raw_candidates:
+                fn = f.get('file_name', '').lower()
+                # Confirm karein ki query ka har word alag se stand karta hai (Devata / Maadeva leak na ho)
+                if all(re.search(rf"(?:^|[^a-zA-Z0-9]){w}(?:[^a-zA-Z0-9]|$)", fn, re.IGNORECASE) for w in core_words):
+                    matching_files.append(f)
 
     # 🎯 3. Agar User ne Query me Language ya Year likha tha, toh results ko filter karein
     if matching_files and (langs_found or year_found):
