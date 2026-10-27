@@ -354,11 +354,14 @@ async def execute_search(client, message, query: str):
 
         if suggestions:
             for s_title in suggestions:
-                safe_cb = s_title[:60]
-                btn_rows.append([InlineKeyboardButton(f"🎬 {s_title}", callback_data=f"spell_{safe_cb}")])
+                # 64-byte Telegram limit ko ensure karein (max 50 chars / safe bytes)
+                cb_str = s_title.strip()
+                while len(f"spell_{cb_str}".encode('utf-8')) > 60:
+                    cb_str = cb_str[:-1].strip()
+                btn_rows.append([InlineKeyboardButton(f"🎬 {s_title}", callback_data=f"spell_{cb_str}")])
 
-        safe_q = re.sub(r'[^a-zA-Z0-9]', '_', core_title[:20]).strip('_')
-        btn_rows.append([InlineKeyboardButton("✨ 𝚁𝚎𝚚𝚞𝚎𝚜𝚝 𝚃𝚑𝚒𝚜 𝙼𝚘𝚟𝚒𝚎 🎬", callback_data=f"req_{safe_q}")])
+        safe_q = re.sub(r'[^a-zA-Z0-9]', '_', core_title[:20]).strip('_') or "movie"
+        btn_rows.append([InlineKeyboardButton("✨ 𝚁𝚎𝚚𝚞𝚎𝚜𝚝 𝚃𝚑𝚒𝚜 𝙼𝚘𝚟𝚒𝚎 🎬", callback_data=f"req_{safe_q[:35]}")])
 
         reply_markup = InlineKeyboardMarkup(btn_rows)
 
@@ -505,8 +508,10 @@ async def execute_search(client, message, query: str):
                 if db_recs:
                     rec_row = []
                     for sim_t in db_recs:
-                        safe_rec = sim_t[:50]
-                        rec_row.append(InlineKeyboardButton(f"🎬 {safe_rec}", callback_data=f"spell_{safe_rec}"))
+                        cb_rec = sim_t.strip()
+                        while len(f"spell_{cb_rec}".encode('utf-8')) > 60:
+                            cb_rec = cb_rec[:-1].strip()
+                        rec_row.append(InlineKeyboardButton(f"🎬 {sim_t[:25]}", callback_data=f"spell_{cb_rec}"))
                     post_buttons.append(rec_row)
 
             reply_markup = InlineKeyboardMarkup(post_buttons) if post_buttons else None
