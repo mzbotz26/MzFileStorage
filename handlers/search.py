@@ -191,7 +191,7 @@ async def get_tmdb_metadata(title: str, year: str = None) -> dict:
                 if media_type not in ["movie", "tv"]:
                     media_type = "movie"
 
-                detail_url = f"https://api.themoviedb.org/3/{media_type}/{media_id}?api_key={TMDB_API_KEY}&append_to_response=videos,recommendations"
+                detail_url = f"https://api.themoviedb.org/3/{media_type}/{media_id}?api_key={TMDB_API_KEY}&append_to_response=videos"
                 async with session.get(detail_url, timeout=4) as det_resp:
                     if det_resp.status != 200:
                         return {}
@@ -231,6 +231,31 @@ async def get_tmdb_metadata(title: str, year: str = None) -> dict:
                     }
     except Exception:
         return {}
+
+async def get_db_recommendations(current_title: str, limit: int = 2) -> list:
+    """Database se random/recent uploaded Indian movies ke clean titles recommend karta hai."""
+    try:
+        # Haal hi me upload hui 50 files uthayein
+        recent_files = await files.find({}, {"file_name": 1}).sort("_id", -1).to_list(length=50)
+        
+        seen = set()
+        suggestions = []
+        curr_clean = current_title.lower().strip()
+
+        for f in recent_files:
+            fname = f.get('file_name', '')
+            t = fast_clean_title(fname)
+            t_low = t.lower().strip()
+            
+            # Khali na ho, current movie na ho aur pehle add na hui ho
+            if len(t) > 2 and t_low not in seen and curr_clean not in t_low and t_low not in curr_clean:
+                seen.add(t_low)
+                suggestions.append(t.title())
+                if len(suggestions) >= limit:
+                    break
+        return suggestions
+    except Exception:
+        return []
 
 
 def get_quality_order(parsed_dict: dict, file_name: str = "") -> int:
@@ -475,12 +500,14 @@ async def execute_search(client, message, query: str):
             if movie_meta and movie_meta.get("trailer") and idx == 1:
                 post_buttons.append([InlineKeyboardButton("🎬 Watch Official Trailer", url=movie_meta["trailer"])])
 
-            if movie_meta and movie_meta.get("similar") and idx == 1:
-                rec_row = []
-                for sim_t in movie_meta["similar"][:2]:
-                    safe_rec = sim_t[:25]
-                    rec_row.append(InlineKeyboardButton(f"🎬 {safe_rec}", callback_data=f"spell_{safe_rec}"))
-                if rec_row:
+            # 💡 Database Se Apni Upload Ki Gayi Movies Ke Buttons
+            if idx == 1:
+                db_recs = await get_db_recommendations(core_title, limit=2)
+                if db_recs:
+                    rec_row = []
+                    for sim_t in db_recs:
+                        safe_rec = sim_t[:50]
+                        rec_row.append(InlineKeyboardButton(f"🎬 {safe_rec}", callback_data=f"spell_{safe_rec}"))
                     post_buttons.append(rec_row)
 
             reply_markup = InlineKeyboardMarkup(post_buttons) if post_buttons else None
