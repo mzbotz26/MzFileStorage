@@ -226,8 +226,7 @@ async def get_tmdb_metadata(title: str, year: str = None) -> dict:
                         "genre": genre_str,
                         "runtime": runtime_str,
                         "storyline": short_overview,
-                        "trailer": trailer_url,
-                        "similar": similar_titles
+                        "trailer": trailer_url
                     }
     except Exception:
         return {}
