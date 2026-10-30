@@ -335,9 +335,9 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         'Web', r'\d+Kbps', 'UNCUT', 'ORG', 'HQ', 'ESubs', 'MSubs', 'REMASTERED', 'REPACK', 'Hd', 'Hdm', 'Original', 'Unofficial',
         'PROPER', 'iNTERNAL', 'Sample', 'Video', 'Dual', 'Audio', 'Multi', 'Hollywood', 'Hdtc', 'True', 'Themoviesboss', 'World4Ufree',
         'New', 'Combined', 'Complete', 'Chapter', 'PSA', 'JC', 'DIDAR', 'StarBoy', 'Movies', 'Mp4', 'Boxoffice', 'Pics', 'Hungama',
-        'Hindi', 'English', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Japanese', 'Korean', 'Marathi',
-        'NF', 'AMZN', 'MAX', 'DSNP', 'ZEE5', 'SONY', 'WEB-DL', 'HDRip', 'WEBRip', 'HEVC', 'x265', 'x264', 'AAC',
-        '1tamilmv', 'www', 'Join Us', 'Day', 'BBHin', 'JioCinema', 'Hotstar', 'SonyLiv', 'Voot',
+        'Hindi', 'English', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Japanese', 'Korean', 'Marathi', 'Lionsgateplay',
+        'NF', 'AMZN', 'MAX', 'DSNP', 'ZEE5', 'SONY', 'WEB-DL', 'HDRip', 'WEBRip', 'HEVC', 'x265', 'x264', 'AAC', 'Jhs',
+        '1tamilmv', 'www', 'Join Us', 'Day', 'BBHin', 'JioCinema', 'JioHotstar', 'SonyLiv', 'Voot',
         'DD5', 'DD', 'DDP', 'Atmos', 'Kbps'
     ]
     junk_pattern_re = r'\b(' + r'|'.join(junk_words) + r')\b'
