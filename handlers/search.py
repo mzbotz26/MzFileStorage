@@ -760,3 +760,24 @@ async def verify_log_callback(client, callback_query):
         await callback_query.answer(f"Action Done: {status_label}", show_alert=True)
     except Exception:
         pass
+
+
+# ============================================================
+# ℹ️ SEARCH & REQUEST FORMAT GUIDE HANDLER
+# ============================================================
+@Client.on_callback_query(filters.regex(r"^show_req_format$"))
+async def show_request_format_handler(client, callback_query):
+    guide_text = (
+        "📌 Movie / Series Search & Request Format:\n\n"
+        "❌ Galat Tarika:\n"
+        "• Pushpa movie send karo bro\n"
+        "• Jawan 2023 1080p full HD download link\n"
+        "• Pk film hindi dubbed\n\n"
+        "✅ Sahi Tarika (Sirf Movie Ka Naam):\n"
+        "• Pushpa 2\n"
+        "• Jawan\n"
+        "• PK\n\n"
+        "💡 Tip: Spelling check karne ke liye Google ka use karein. Extra words (send, do, link, full movie) bilkul na likhein!"
+    )
+    await callback_query.answer(guide_text, show_alert=True)
+    
