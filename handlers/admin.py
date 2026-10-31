@@ -88,8 +88,8 @@ async def broadcast_callback_handler(client, query):
         elif broadcast_type == "storage": user_ids = await get_storage_owner_ids()
         else: user_ids = await get_normal_user_ids()
             
-        status_msg = await query.message.edit_text(f"Broadcasting to {len(user_ids)} users...")
-        success, fail = await broadcast_message(client, user_ids, message_to_broadcast)
+        status_msg = await query.message.edit_text(f"🚀 **Broadcasting Started...**\n👥 Total Users: `{len(user_ids)}`")
+        success, fail = await broadcast_message(client, user_ids, message_to_broadcast, status_msg=status_msg)
         await status_msg.edit_text(f"✅ **Broadcast Complete**\n\nSent to: `{success}` users.\nFailed for: `{fail}` users.")
     except Exception:
         logger.exception("Error in broadcast_callback_handler")
