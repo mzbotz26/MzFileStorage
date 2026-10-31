@@ -331,15 +331,25 @@ async def execute_search(client, message, query: str, chat_id: int = None):
                 if clean_name == core_title.lower() or clean_name.startswith(f"{core_title.lower()} ("):
                     matching_files.append(f)
     else:
-        # 🎯 2. Normal movie queries ke liye: Ultra Flexible & Crash-Proof Search
-        # A. Multi-word $and match: Tanhaji (with colon), Pushpa, Dhappa sab accurately match honge
+        # 🎯 2. Normal movie queries: Exact / Start Title ko Top Priority Dein
+        # Step A: Pehle check karein ki kya core title se shuru hone wali ya exact match file hai
+        clean_q_regex = rf"^(?:\[.*?\]|\(.*?\)|@\w+|\s)*{re.escape(core_title)}\b"
+        exact_start_matches = await files.find({"file_name": {"$regex": clean_q_regex, "$options": "i"}}).to_list(length=200)
+
+        # Step B: Multi-word generic match
         and_conditions = [
             {"file_name": {"$regex": rf"(?:^|[^a-zA-Z0-9]){re.escape(w)}(?:[^a-zA-Z0-9]|$)", "$options": "i"}}
             for w in core_words
         ]
-        matching_files = await files.find({"$and": and_conditions}).to_list(length=300)
+        generic_matches = await files.find({"$and": and_conditions}).to_list(length=300)
 
-        # B. Fallback: Agar kisi file me symbol issue ho, toh delimiter sequence search karein
+        # Agar exact/start match file mil gayi hai, toh sirf wahi dikhayein; warna generic fallback use karein
+        if exact_start_matches:
+            matching_files = exact_start_matches
+        else:
+            matching_files = generic_matches
+
+        # C. Fallback: Symbol issue hone par delimiter search
         if not matching_files:
             joined_words = r"[\s._\-:]+".join([re.escape(w) for w in core_words])
             pattern = re.compile(joined_words, re.IGNORECASE)
@@ -427,6 +437,19 @@ async def execute_search(client, message, query: str, chat_id: int = None):
 
         group_key = f"{base_title} ({year})" if year else base_title
         grouped_posts[group_key].append((f, parsed))
+
+    # 🎯 FIX: Exact Matched Title ko hamesha 1st number par bhejein
+    def title_priority(item):
+        title_name = item[0].lower()
+        core_low = core_title.lower()
+        if title_name.startswith(core_low):
+            return 0  # Sabse pehle 'Gondhal' aayega
+        elif core_low in title_name:
+            return 1  # 'Punha Gondhal' baad me aayega
+        return 2
+
+    sorted_grouped_posts = dict(sorted(grouped_posts.items(), key=title_priority))
+    grouped_posts = sorted_grouped_posts
 
     sent_result_messages = []
 
