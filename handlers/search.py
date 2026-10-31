@@ -378,6 +378,8 @@ async def execute_search(client, message, query: str, chat_id: int = None):
 
         safe_q = re.sub(r'[^a-zA-Z0-9]', '_', core_title[:20]).strip('_') or "movie"
         btn_rows.append([InlineKeyboardButton("✨ 𝚁𝚎𝚚𝚞𝚎𝚜𝚝 𝚃𝚑𝚒𝚜 𝙼𝚘𝚟𝚒𝚎 🎬", callback_data=f"req_{safe_q[:35]}")])
+        # 2. Sahi Request/Search Format Guide Button
+        btn_rows.append([InlineKeyboardButton("ℹ️ Sahi Request Format Dekhein ✍️", callback_data="show_req_format")])
 
         reply_markup = InlineKeyboardMarkup(btn_rows)
 
