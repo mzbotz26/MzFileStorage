@@ -507,6 +507,10 @@ async def create_post(client, user_id, messages, cache: dict):
                 f"🔥 ➮ [⚡ 𝐆𝐞𝐭 𝐀𝐥𝐥 𝐐𝐮𝐚𝐥𝐢𝐭𝐢𝐞𝐬 𝐢𝐧 𝟏 𝐂𝐥𝐢𝐜𝐤]({batch_url})\n"
                 f"╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌"
             )
+
+    # 🎯 Multi-Part Split Detector
+    distinct_parts = {info.get('part_info') for info in media_info_list if info.get('part_info')}
+    has_multiple_split_parts = len(distinct_parts) > 1
             
     all_link_entries = []
     for info in media_info_list:
@@ -528,8 +532,13 @@ async def create_post(client, user_id, messages, cache: dict):
         elif ep_text:
             display_tags_parts.append(ep_text)
 
+        # 🎯 Safe Part Display Check
         if info.get('part_info') and info.get('part_info') != day_str:
-            display_tags_parts.append(info['part_info'])
+            p_num = re.findall(r'\d+', info['part_info'])
+            if has_multiple_split_parts:
+                display_tags_parts.append(info['part_info'])
+            elif p_num and not re.search(rf'\bpart\s*0*{p_num[0]}\b', primary_display_title, re.IGNORECASE):
+                display_tags_parts.append(info['part_info'])
                 
         if info.get('quality_tags'):
             for q_tag in info['quality_tags'].split(' | '):
