@@ -502,7 +502,7 @@ async def create_post(client, user_id, messages, cache: dict):
             batch_url = f"https://t.me/{bot_username}?start=b_{encoded_batch}"
             
             # Hyperlink text format
-            batch_section = f"\n\n⚡ ➪ [All Quality Download (Batch)]({batch_url})"
+            batch_section = f"\n\n⚡ ➪ [All Quality Download]({batch_url})"
 
     all_link_entries = []
     for info in media_info_list:
