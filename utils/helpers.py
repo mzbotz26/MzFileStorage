@@ -532,14 +532,19 @@ async def create_post(client, user_id, messages, cache: dict):
         elif ep_text:
             display_tags_parts.append(ep_text)
 
-        # 🎯 Safe Part Display Check
-        if info.get('part_info') and info.get('part_info') != day_str:
-            p_num = re.findall(r'\d+', info['part_info'])
+        # 🎯 Safe Part Display Check (Fixed Regex)
+        part_tag = info.get('part_info', '')
+        if part_tag and part_tag != day_str:
             if has_multiple_split_parts:
-                display_tags_parts.append(info['part_info'])
-            elif p_num and not re.search(rf'\bpart\s*0*{p_num[0]}\b', primary_display_title, re.IGNORECASE):
-                display_tags_parts.append(info['part_info'])
-                
+                display_tags_parts.append(part_tag)
+            else:
+                p_digits = re.findall(r'\d+', part_tag)
+                # Int me convert karne se '01' ban jayega '1', jisse Title ka 'Part 1' pakad me aayega
+                p_val = str(int(p_digits[0])) if p_digits else ""
+                has_in_title = bool(re.search(rf'\b(?:part|pt|chapter)[\s._-]*0*{p_val}\b', primary_display_title, re.IGNORECASE))
+                if not has_in_title:
+                    display_tags_parts.append(part_tag)
+
         if info.get('quality_tags'):
             for q_tag in info['quality_tags'].split(' | '):
                 q_clean = q_tag.strip()
