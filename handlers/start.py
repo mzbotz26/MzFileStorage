@@ -501,4 +501,280 @@ async def handle_public_file_request(client, message, requester_id, payload):
     
     from database.db import verified_users
     v_data = await verified_users.find_one({"owner_id": owner_id, "requester_id": requester_id})
- 
+    if v_data and "expires_at" in v_data:
+        rem_seconds = (v_data["expires_at"] - datetime.datetime.utcnow()).total_seconds()
+        if rem_seconds > 0:
+            rem_mins = int(rem_seconds // 60)
+            if rem_mins > 0:
+                await message.reply_text(
+                    f"💎 <b>Verify Access Unlocked</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏳ <b>Validity:</b> <code>{rem_mins} Minutes</code>\n"
+                    f"⚡️ <b>Mode:</b> Instant Download (Ad-Free)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"<i>Enjoy your streaming & downloads!</i>",
+                    parse_mode=enums.ParseMode.HTML
+                )
+
+    await send_file(client, requester_id, owner_id, file_unique_id)
+
+
+# ============================================================
+# ⚡ BATCH FILE REQUEST HANDLER (Decodes b_ from helpers.py)
+# ============================================================
+async def handle_batch_file_request(client, message, requester_id: int, payload: str):
+    raw_token = payload.split("_", 1)[1] if "_" in payload else payload
+
+    # 1. Base64 Decode
+    try:
+        padding = 4 - (len(raw_token) % 4)
+        if padding != 4:
+            raw_token += "=" * padding
+
+        decoded_text = base64.urlsafe_b64decode(raw_token.encode('ascii')).decode('ascii')
+        parts = decoded_text.split("_")
+        
+        # Expected: batch_{owner_id}_{min_id}_{max_id}
+        if len(parts) >= 4 and parts[0] == "batch":
+            owner_id = int(parts[1])
+            min_id = int(parts[2])
+            max_id = int(parts[3])
+        else:
+            return await message.reply_text("❌ Batch link corrupt ya invalid format mein hai.")
+    except Exception as e:
+        logger.error(f"Error decoding batch payload '{payload}': {e}")
+        return await message.reply_text("❌ Batch link decode nahi ho saka.")
+
+    owner_settings = await get_user(owner_id)
+
+    # 2. Dual FSub Check for Batch
+    normal_fsub = owner_settings.get("fsub_channel") if owner_settings else None
+    req_fsub = owner_settings.get("req_fsub_channel") if owner_settings else None
+    missing_buttons = []
+
+    if normal_fsub:
+        try:
+            normal_fsub = int(str(normal_fsub).strip())
+            await client.get_chat_member(normal_fsub, requester_id)
+        except UserNotParticipant:
+            try:
+                normal_invite = await client.export_chat_invite_link(normal_fsub)
+            except Exception:
+                normal_invite = owner_settings.get("fsub_invite_link") or "https://t.me"
+
+            ch_title = "Main Channel"
+            try:
+                chat_info = await client.get_chat(normal_fsub)
+                if chat_info and chat_info.title:
+                    ch_title = chat_info.title
+            except Exception:
+                pass
+
+            missing_buttons.append([InlineKeyboardButton(f"📢 Join {ch_title}", url=normal_invite)])
+        except Exception:
+            pass
+
+    if req_fsub:
+        try:
+            req_fsub = int(str(req_fsub).strip())
+            has_requested = await has_requested_join(requester_id, req_fsub)
+            if not has_requested:
+                try:
+                    await client.get_chat_member(req_fsub, requester_id)
+                except UserNotParticipant:
+                    try:
+                        invite_obj = await client.create_chat_invite_link(
+                            chat_id=req_fsub,
+                            creates_join_request=True
+                        )
+                        req_invite = invite_obj.invite_link
+                    except Exception:
+                        req_invite = owner_settings.get("req_fsub_invite_link") or "https://t.me"
+
+                    req_title = "Backup Channel"
+                    try:
+                        req_info = await client.get_chat(req_fsub)
+                        if req_info and req_info.title:
+                            req_title = req_info.title
+                    except Exception:
+                        pass
+
+                    missing_buttons.append([InlineKeyboardButton(f"📩 Request to Join {req_title}", url=req_invite)])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    if missing_buttons:
+        missing_buttons.append([InlineKeyboardButton("🔄 Try Again", callback_data=f"retry_{payload}")])
+
+        user_mention = getattr(message.from_user, "mention", "User")
+        fsub_text = (
+            f"👋 **Hey {user_mention},**\n\n"
+            "🔒 **Batch Access Restricted!**\n"
+            "Saari files unlock karne ke liye aapko niche diye gaye channel requirements poore karne honge:\n\n"
+            "1️⃣ **Join Channel:** Main channel join karein.\n"
+            "2️⃣ **Request to Join:** Backup channel me join request bhejien.\n\n"
+            "Dono complete karne ke baad **'🔄 Try Again'** button press karein."
+        )
+
+        return await message.reply_text(
+            text=fsub_text,
+            reply_markup=InlineKeyboardMarkup(missing_buttons),
+            disable_web_page_preview=True
+        )
+
+    # 3. Verification Check for Batch
+    if requester_id == owner_id or requester_id == Config.ADMIN_ID:
+        verified = True
+    else:
+        verified = await is_user_verified(owner_id, requester_id)
+
+    if not verified:
+        current_step = await get_user_verify_step(owner_id, requester_id)
+        
+        step_url = owner_settings.get(f"shortener_url_{current_step}") or owner_settings.get("shortener_url")
+        step_api = owner_settings.get(f"shortener_api_{current_step}") or owner_settings.get("shortener_api")
+        shortener_enabled = owner_settings.get("shortener_enabled", True) if owner_settings else False
+
+        has_active_shortener = bool(shortener_enabled and step_url and step_api)
+        bot_username = client.me.username if hasattr(client, "me") and client.me else "Mzfilestorage_bot"
+
+        # Verification token ke liye first message ID ka use karein
+        reference_token = f"batchfile{min_id}"
+
+        if not has_active_shortener:
+            verify_url = f"https://t.me/{bot_username}?start=verify_{owner_id}_{reference_token}"
+        else:
+            short_id = ''.join(random.choices(string.ascii_letters + string.digits, k=7))
+            ts = int(time.time())
+            secret_key = getattr(Config, "SECRET_KEY", "mz_super_secret_anti_bypass_key_2026")
+            
+            raw_data = f"{short_id}_{ts}"
+            sig = hmac.new(secret_key.encode(), raw_data.encode(), hashlib.sha256).hexdigest()
+            
+            from server.stream_routes import register_short_session
+            register_short_session(short_id, owner_id, reference_token, requester_id, ts)
+
+            koyeb_destination = f"{Config.APP_URL.rstrip('/')}/v/{short_id}?sig={sig}___{ts}"
+            verify_url = await get_shortlink(koyeb_destination, owner_id, step=current_step)
+
+        step_tut_key = f"how_to_download_link_{current_step}"
+        tutorial_link = owner_settings.get(step_tut_key) or owner_settings.get("how_to_download_link") if owner_settings else None
+        if not tutorial_link:
+            tutorial_link = Config.TUTORIAL_URL
+
+        buttons = [
+            [InlineKeyboardButton("🔐 Verify To Get All Files", url=verify_url)],
+            [InlineKeyboardButton("📖 How To Verify", url=tutorial_link)]
+        ]
+
+        return await message.reply_text(
+            "🔒 **Batch Access Restricted**\n\n"
+            "Saari qualities ek sath unlock karne ke liye aapko quick verification poori karni hogi.\n\n"
+            "👇 Niche button par click karke verify karein:",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=enums.ParseMode.MARKDOWN
+        )
+
+    # 4. Verified → Deliver All Messages from Source Channel
+    await record_daily_view(owner_id, requester_id)
+    source_db_channel = int(str(client.owner_db_channel).strip())
+
+    status_msg = await message.reply_text("🚀 **Saari qualities fetch ho rahi hain, kripya intezar karein...**")
+    
+    total_files = max_id - min_id + 1
+    sent_count = 0
+
+    for msg_id in range(min_id, max_id + 1):
+        try:
+            # File data se clean caption banana
+            file_entry = await files.find_one({"owner_id": owner_id, "file_id": msg_id})
+            
+            if file_entry:
+                file_name_raw = file_entry.get('file_name', 'N/A')
+                file_name_semi_cleaned = re.sub(r'@[a-zA-Z0-9_]+', '', file_name_raw).strip()
+                file_name_semi_cleaned = re.sub(r'(www\.|https?://)\S+', '', file_name_semi_cleaned).strip()
+                file_name_semi_cleaned = file_name_semi_cleaned.replace('_', ' ')
+                file_name_semi_cleaned = re.sub(r'join\s*us', '', file_name_semi_cleaned, flags=re.IGNORECASE)
+
+                filename_url = owner_settings.get("filename_url")
+                filename_part = f"[{file_name_semi_cleaned}]({filename_url})" if filename_url else f"`{file_name_semi_cleaned}`"
+
+                stream_msg_id = file_entry.get('stream_id') or msg_id
+                btn_markup = InlineKeyboardMarkup([[InlineKeyboardButton("📺 Stream / Download", url=f"{Config.APP_URL.rstrip('/')}/watch/{stream_msg_id}")]])
+
+                caption = (
+                    f"✅ **Here is your file!**\n\n"
+                    f"{filename_part}\n\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"🗑 **File automatically deleted after 10 minutes.**"
+                )
+            else:
+                caption = None
+                btn_markup = None
+
+            sent_msg = await client.copy_message(
+                chat_id=requester_id,
+                from_chat_id=source_db_channel,
+                message_id=msg_id,
+                caption=caption,
+                reply_markup=btn_markup,
+                parse_mode=enums.ParseMode.MARKDOWN
+            )
+
+            if sent_msg and hasattr(sent_msg, 'id'):
+                asyncio.create_task(auto_delete_message(client, requester_id, sent_msg.id))
+            
+            sent_count += 1
+            await asyncio.sleep(0.4)
+
+        except UserIsBlocked:
+            break
+        except Exception as err:
+            logger.warning(f"Error sending batch file {msg_id}: {err}")
+
+    try:
+        await status_msg.delete()
+    except Exception:
+        pass
+
+
+@Client.on_callback_query(filters.regex(r"^retry_"))
+async def retry_handler(client, query):
+    try:
+        await query.message.delete()
+    except (MessageDeleteForbidden, MessageNotModified):
+        await query.answer("Retrying...", show_alert=False)
+    except Exception as e:
+        logger.warning(f"Could not delete message in retry_handler: {e}")
+    
+    try:
+        payload_data = query.data.split("_", 1)[1]
+        if payload_data.startswith("b_") or payload_data.startswith("batch_"):
+            await handle_batch_file_request(client, query.message, query.from_user.id, payload_data)
+        else:
+            await handle_public_file_request(client, query.message, query.from_user.id, payload_data)
+    except UserIsBlocked:
+        logger.warning(f"User {query.from_user.id} blocked the bot during retry.")
+        await query.answer("Could not retry because you have blocked the bot.", show_alert=True)
+
+
+@Client.on_callback_query(filters.regex(r"go_back_"))
+async def go_back_callback(client, query):
+    user_id = int(query.data.split("_")[-1])
+    if query.from_user.id != user_id:
+        return await query.answer("This is not for you!", show_alert=True)
+    try:
+        menu_text, menu_markup = await get_main_menu(user_id)
+        await query.message.edit_text(
+            text=menu_text,
+            reply_markup=menu_markup,
+            parse_mode=enums.ParseMode.MARKDOWN,
+            disable_web_page_preview=True
+        )
+    except MessageNotModified:
+        await query.answer()
+    except Exception as e:
+        logger.error(f"Error in go_back_callback: {e}")
+        await query.answer("An error occurred while loading the menu.", show_alert=True)
