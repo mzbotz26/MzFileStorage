@@ -503,9 +503,9 @@ async def create_post(client, user_id, messages, cache: dict):
             
             # Hyperlink text format
             batch_section = (
-                f"\n\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
+                f"\n\n╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌\n"
                 f"🔥 ➮ [⚡ 𝐆𝐞𝐭 𝐀𝐥𝐥 𝐐𝐮𝐚𝐥𝐢𝐭𝐢𝐞𝐬 𝐢𝐧 𝟏 𝐂𝐥𝐢𝐜𝐤]({batch_url})\n"
-                f"┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
+                f"╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌"
             )
             
     all_link_entries = []
