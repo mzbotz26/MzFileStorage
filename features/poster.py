@@ -242,17 +242,30 @@ async def _find_poster_from_tmdb(query: str, year: str = None, season_num: int =
                             is_exact = (query_norm == title or query_norm == orig_title or clean_t1 == clean_t2 or clean_t1 == clean_t3)
 
                             if is_single_word:
-                                if not is_exact:
+                                # Agar title query se shuru hota hai (e.g. "Ramayana: Part 1" starts with "ramayana")
+                                starts_with_q = title.startswith(query_norm) or orig_title.startswith(query_norm)
+                                
+                                if not (is_exact or starts_with_q):
                                     continue
+                                
+                                # Indian languages ko direct accept karein
                                 if orig_lang in ['hi', 'mr', 'ta', 'te', 'ml', 'kn']:
-                                    return f"https://image.tmdb.org/t/p/original{poster}"
+                                    if year and res_year:
+                                        try:
+                                            if abs(int(year) - int(res_year)) <= 2:
+                                                return f"https://image.tmdb.org/t/p/original{poster}"
+                                        except ValueError:
+                                            pass
+                                    else:
+                                        return f"https://image.tmdb.org/t/p/original{poster}"
+
                                 if year and res_year:
                                     try:
                                         if abs(int(year) - int(res_year)) <= 2:
                                             return f"https://image.tmdb.org/t/p/original{poster}"
                                     except ValueError:
                                         pass
-                                else:
+                                elif is_exact:
                                     return f"https://image.tmdb.org/t/p/original{poster}"
 
                             if not is_single_word:
