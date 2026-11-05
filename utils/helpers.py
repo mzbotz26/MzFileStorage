@@ -467,12 +467,11 @@ async def create_post(client, user_id, messages, cache: dict):
     else:
         primary_display_title = base_title_clean
     
+    # 🎯 Agar Series hai toh season tag ko poster query ke sath bhejein taaki TV API trigger ho
+    raw_title = first_info.get('clean_search_title') or first_info.get('display_title') or ''
     season_tag = first_info.get('season_info') or ''
-    raw_batch = first_info.get('batch_title') or ''
-    if season_tag and season_tag in raw_batch:
-        raw_batch = raw_batch.replace(season_tag, '').strip()
-
-    poster_search_query = first_info.get('clean_search_title') or raw_batch or base_title_clean
+    
+    poster_search_query = f"{raw_title} {season_tag}".strip()
     poster_search_query = re.sub(r'\b(comedycha\s*5g|comedycha)\b.*$', '', poster_search_query, flags=re.IGNORECASE).strip()
     poster_search_query = re.sub(r'\s+', ' ', poster_search_query).strip()
 
