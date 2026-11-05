@@ -318,6 +318,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
 
     title_to_clean = re.sub(r'[\(\[\{].*?[\)\]\}]', ' ', title_to_clean)
     title_to_clean = re.sub(r'[\(\[\{\}\]\)\'\"`]', ' ', title_to_clean)
+    title_to_clean = re.sub(r'(?i)\b(Blu-?Ray|BRRip|BDRip|Blu|10bit|8bit)\b', ' ', title_to_clean)
     
     junk_words = [
         'DS4K', 'DS-4K', 'Ep', 'Eps', 'Episode', 'Episodes', 'Season', 'Series', 'South', 'Dubbed', 'Completed', 'Esub', 'Villa',
