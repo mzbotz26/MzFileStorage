@@ -123,13 +123,18 @@ async def send_file(client, requester_id, owner_id, file_unique_id):
         ]
         keyboard = InlineKeyboardMarkup(buttons)
 
-        # Clean filename
+        # Clean filename (Removes [TG], brackets, links, leading dots)
         file_name_raw = file_data.get('file_name', 'N/A')
         file_name_semi_cleaned = re.sub(r'@[a-zA-Z0-9_]+', '', file_name_raw).strip()
         file_name_semi_cleaned = re.sub(r'(www\.|https?://)\S+', '', file_name_semi_cleaned).strip()
-        file_name_semi_cleaned = file_name_semi_cleaned.replace('_', ' ')
         file_name_semi_cleaned = re.sub(r'join\s*us', '', file_name_semi_cleaned, flags=re.IGNORECASE)
-        
+
+        # 🎯 Start ke [TG ], [TG], kisi bhi tarah ke brackets [...] aur starting dots/spaces hataye
+        file_name_semi_cleaned = re.sub(r'^\s*\[.*?\][\s\._-]*', '', file_name_semi_cleaned)
+        file_name_semi_cleaned = re.sub(r'^[._\-\s]+', '', file_name_semi_cleaned)
+        file_name_semi_cleaned = file_name_semi_cleaned.replace('_', ' ')
+        file_name_semi_cleaned = re.sub(r'\s+', ' ', file_name_semi_cleaned).strip()
+
         filename_url = owner_settings.get("filename_url")
 
         if filename_url:
