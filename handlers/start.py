@@ -235,9 +235,26 @@ async def start_command(client, message):
 
                 current_step = await get_user_verify_step(owner_id, requester_id)
                 vlog_ch = await get_verify_log_channel(owner_id)
-                file_obj = await get_file_by_unique_id(owner_id, file_unique_id)
-                fname = file_obj.get("file_name", "Unknown File") if file_obj else "Unknown"
-                
+
+                # 🎯 Fetch filename: Handle batch links vs single file links
+                if file_unique_id.startswith("batchfile"):
+                    try:
+                        batch_msg_id = int(file_unique_id.replace("batchfile", "").strip())
+                        b_file = await files.find_one({"owner_id": owner_id, "file_id": batch_msg_id})
+                        if b_file and b_file.get("file_name"):
+                            raw_fname = b_file.get("file_name")
+                            # Clean leading tags, brackets and dots
+                            raw_fname = re.sub(r'^\s*\[.*?\][\s\._-]*', '', raw_fname)
+                            raw_fname = re.sub(r'^[._\-\s]+', '', raw_fname).strip()
+                            fname = f"{raw_fname} (Batch)"
+                        else:
+                            fname = "All Qualities (Batch)"
+                    except Exception:
+                        fname = "All Qualities (Batch)"
+                else:
+                    file_obj = await get_file_by_unique_id(owner_id, file_unique_id)
+                    fname = file_obj.get("file_name", "Unknown File") if file_obj else "Unknown"
+                    
                 if owner_settings:
                     gap_val = owner_settings.get(f'verify_gap_{current_step}') or owner_settings.get('verify_gap', 720)
                 else:
