@@ -700,8 +700,13 @@ async def handle_batch_file_request(client, message, requester_id: int, payload:
                 file_name_raw = file_entry.get('file_name', 'N/A')
                 file_name_semi_cleaned = re.sub(r'@[a-zA-Z0-9_]+', '', file_name_raw).strip()
                 file_name_semi_cleaned = re.sub(r'(www\.|https?://)\S+', '', file_name_semi_cleaned).strip()
-                file_name_semi_cleaned = file_name_semi_cleaned.replace('_', ' ')
                 file_name_semi_cleaned = re.sub(r'join\s*us', '', file_name_semi_cleaned, flags=re.IGNORECASE)
+
+                # 🎯 Start ke [TG ], [TG], kisi bhi tarah ke brackets [...] aur starting dots/spaces hataye
+                file_name_semi_cleaned = re.sub(r'^\s*\[.*?\][\s\._-]*', '', file_name_semi_cleaned)
+                file_name_semi_cleaned = re.sub(r'^[._\-\s]+', '', file_name_semi_cleaned)
+                file_name_semi_cleaned = file_name_semi_cleaned.replace('_', ' ')
+                file_name_semi_cleaned = re.sub(r'\s+', ' ', file_name_semi_cleaned).strip()
 
                 filename_url = owner_settings.get("filename_url")
                 filename_part = f"[{file_name_semi_cleaned}]({filename_url})" if filename_url else f"`{file_name_semi_cleaned}`"
