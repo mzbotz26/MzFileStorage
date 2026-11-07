@@ -319,6 +319,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
     title_to_clean = re.sub(r'[\(\[\{].*?[\)\]\}]', ' ', title_to_clean)
     title_to_clean = re.sub(r'[\(\[\{\}\]\)\'\"`]', ' ', title_to_clean)
     title_to_clean = re.sub(r'(?i)\b(Blu-?Ray|BRRip|BDRip|Blu|10bit|8bit)\b', ' ', title_to_clean)
+    title_to_clean = re.sub(r'(?i)\b(WEB-?DL|WEBRip|HDRip|DL)\b', ' ', title_to_clean)
     
     junk_words = [
         'DS4K', 'DS-4K', 'Ep', 'Eps', 'Episode', 'Episodes', 'Season', 'Series', 'South', 'Dubbed', 'Completed', 'Esub', 'Villa',
@@ -327,7 +328,7 @@ async def clean_and_parse_filename(name: str, cache: dict = None):
         'New', 'Combined', 'Complete', 'Chapter', 'PSA', 'JC', 'DIDAR', 'StarBoy', 'Movies', 'Mp4', 'Boxoffice', 'Pics', 'Hungama',
         'Hindi', 'English', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Japanese', 'Korean', 'Marathi', 'Lionsgateplay',
         'NF', 'AMZN', 'MAX', 'DSNP', 'ZEE5', 'SONY', 'WEB-DL', 'HDRip', 'WEBRip', 'HEVC', 'x265', 'x264', 'AAC', 'Jhs', 'Sliv',
-        '1tamilmv', 'www', 'Join Us', 'Day', 'BBHin', 'JioCinema', 'JioHotstar', 'SonyLiv', 'Voot',
+        '1tamilmv', 'www', 'Join Us', 'Day', 'BBHin', 'JioCinema', 'JioHotstar', 'SonyLiv', 'Voot', 'Dl',
         'DD5', 'DD', 'DDP', 'Atmos', 'Kbps', 'BluRay', 'Blu-Ray', 'Blu', 'BRRip', 'BDRip', 'Ray', '10bit', '8bit'
     ]
     junk_pattern_re = r'\b(' + r'|'.join(junk_words) + r')\b'
