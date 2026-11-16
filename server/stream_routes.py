@@ -485,4 +485,13 @@ async def api_v5_confirm_handler(request):
         # 🎯 Batch Link Redirect vs Single File Redirect
         if is_batch_token and batch_min_id is not None and batch_max_id is not None:
             raw_batch_str = f"batch_{owner_id}_{batch_min_id}_{batch_max_id}"
-          
+            encoded_batch = base64.urlsafe_b64encode(raw_batch_str.encode('ascii')).decode('ascii').rstrip("=")
+            bot_deep_link = f"https://t.me/{bot_username}?start=batch_{encoded_batch}"
+        else:
+            bot_deep_link = f"https://t.me/{bot_username}?start=get_{owner_id}_{file_unique_id}"
+
+        return web.json_response({"status": "ok", "redirect": bot_deep_link})
+
+    except Exception as e:
+        logger.error(f"Error in api_v5_confirm: {e}")
+        return web.json_response({"status": "error"}, status=400)
