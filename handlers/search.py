@@ -592,6 +592,16 @@ BLOCKED_SEARCH_KEYWORDS = {
 @Client.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings"]))
 async def direct_text_search(client, message):
     raw_text = message.text.strip()
+
+    # 🛑 Koi bhi slash (/) command aaye toh use search mein na bhejein aur user ko warning dein
+    if raw_text.startswith("/"):
+        return await message.reply_text(
+            "🚫 **Yeh command aapke liye nahi hai!**\n\n"
+            "Yeh command sirf **Bot Admin** ke liye reserved hai.\n"
+            "🎬 Aap yahan sirf **Movie ya Web Series ka naam** likh kar search kar sakte hain!",
+            quote=True
+        )
+
     query_clean = raw_text.lower()
 
     # 1. Greetings Filter
